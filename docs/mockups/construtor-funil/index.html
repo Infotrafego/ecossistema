@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>infotráfego · Reconhecimento + Ajuste de Funil</title>
+<style>
+  :root {
+    --navy: #1A3D70;
+    --navy-soft: #2D5A95;
+    --alicerce: #031D31;
+    --rocket: #2563EB;
+    --success: #16A34A;
+    --success-bg: #D1FAE5;
+    --warn: #DC2626;
+    --warn-bg: #FEE2E2;
+    --attention: #D97706;
+    --attention-bg: #FEF3C7;
+    --gray: #6B7280;
+    --ash: #C7D2D7;
+    --ink: #0F172A;
+    --ink-soft: #475569;
+    --muted: #94A3B8;
+    --muted-soft: #CBD5E1;
+    --surface: #FFFFFF;
+    --surface-soft: #F1F5F9;
+    --border: #E2E8F0;
+    --bg: #F8FAFC;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Space Grotesk","Inter",-apple-system,BlinkMacSystemFont,system-ui,sans-serif; background: var(--bg); color: var(--ink); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; letter-spacing: -0.005em; }
+
+  .hero { background: var(--alicerce); color: #fff; padding: 22px 32px 18px; }
+  .hero-top { display: flex; align-items: center; gap: 14px; }
+  .hero-logo { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px; }
+  .hero-logo .pill { font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 5px; background: rgba(255,255,255,0.12); text-transform: uppercase; letter-spacing: 0.08em; border: 1px solid rgba(255,255,255,0.18); }
+  .hero-top .subtitle { font-size: 12px; color: rgba(255,255,255,0.7); margin-left: 4px; }
+  .hero-actions { margin-left: auto; display: flex; gap: 8px; }
+  .hero-btn { padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: #fff; font-family: inherit; }
+  .hero-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.32); }
+  .hero-btn.primary { background: var(--success); border-color: var(--success); }
+
+  .step-tabs { display: flex; gap: 4px; padding: 0 32px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .step-tab { padding: 14px 18px; font-size: 13px; font-weight: 700; color: var(--ink-soft); cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.12s; display: flex; align-items: center; gap: 10px; }
+  .step-tab:hover { color: var(--navy); }
+  .step-tab.active { color: var(--navy); border-bottom-color: var(--navy); }
+  .step-tab .num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background: var(--surface-soft); color: var(--ink-soft); border-radius: 50%; font-size: 10px; font-weight: 800; }
+  .step-tab.active .num { background: var(--navy); color: #fff; }
+  .step-tab.done .num { background: var(--success); color: #fff; }
+  .step-tab.disabled { opacity: 0.4; pointer-events: none; }
+
+  .main { padding: 22px 32px; max-width: 1500px; margin: 0 auto; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .conn-wrap { display: grid; grid-template-columns: 1fr 380px; gap: 16px; align-items: start; }
+  .conn-card, .recog-card, .ajuste-card, .recog-side, .preview, .conn-side, .recog-actions { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+  .conn-card { padding: 24px 26px; }
+  .conn-card h2 { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 4px; }
+  .conn-card .lead { font-size: 12px; color: var(--ink-soft); margin-bottom: 18px; line-height: 1.5; }
+
+  .conn-tipo-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+  .conn-tipo { padding: 16px 14px; background: var(--surface-soft); border: 2px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 0.12s; text-align: center; }
+  .conn-tipo:hover { border-color: var(--ash); }
+  .conn-tipo.selected { border-color: var(--navy); background: #EFF4FB; }
+  .conn-tipo .icon { font-size: 22px; line-height: 1; margin-bottom: 6px; opacity: 0.85; }
+  .conn-tipo .nm { font-size: 13px; font-weight: 800; color: var(--ink); }
+  .conn-tipo .desc { font-size: 10px; color: var(--ink-soft); margin-top: 4px; }
+
+  .conn-form { background: var(--surface-soft); border-radius: 10px; padding: 16px 18px; }
+  .conn-form label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 800; margin-bottom: 5px; display: block; }
+  .conn-form input { font-family: inherit; font-size: 13px; padding: 10px 12px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); font-weight: 500; width: 100%; }
+  .conn-form input:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(26,61,112,0.1); }
+  .conn-form .hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.45; }
+  .conn-actions { margin-top: 18px; display: flex; gap: 8px; }
+  .conn-btn { padding: 10px 18px; border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); font-family: inherit; }
+  .conn-btn.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .conn-btn.primary:hover { background: var(--alicerce); }
+
+  .conn-side { padding: 18px 20px; }
+  .conn-side h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 800; margin: 0 0 10px; }
+  .conn-side .step { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--ink-soft); }
+  .conn-side .step:last-child { border-bottom: 0; }
+  .conn-side .step .num { color: var(--navy); font-weight: 800; flex-shrink: 0; }
+
+  .recog-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .recog-card { padding: 24px 26px; }
+  .recog-head { display: flex; align-items: baseline; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .recog-head h2 { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+  .recog-head .status { padding: 5px 10px; background: var(--success-bg); color: var(--success); border-radius: 5px; font-size: 11px; font-weight: 800; }
+  .recog-section { padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .recog-section:last-child { border-bottom: 0; padding-bottom: 0; }
+  .recog-section .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 800; margin-bottom: 6px; }
+  .recog-section .val { font-size: 16px; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
+  .recog-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .recog-pill { padding: 4px 10px; background: var(--navy); color: #fff; border-radius: 5px; font-size: 11px; font-weight: 700; }
+  .recog-pill.subobj { background: var(--rocket); }
+  .recog-pill.captura { background: var(--alicerce); }
+  .recog-campos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .recog-campo { padding: 5px 10px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 5px; font-size: 11px; font-weight: 700; color: var(--ink-soft); }
+  .recog-campo.marc-mkt { background: var(--rocket); color: #fff; border-color: var(--rocket); }
+  .recog-campo.marc-com { background: var(--success); color: #fff; border-color: var(--success); }
+
+  .recog-actions { padding: 20px 22px; margin-top: 14px; }
+  .recog-actions h3 { font-size: 13px; font-weight: 800; margin: 0 0 6px; }
+  .recog-actions .lead { font-size: 12px; color: var(--ink-soft); margin-bottom: 14px; line-height: 1.5; }
+  .recog-btns { display: flex; gap: 8px; }
+  .recog-btn { padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); font-family: inherit; }
+  .recog-btn.primary { background: var(--success); color: #fff; border-color: var(--success); flex: 1; }
+
+  .recog-side { padding: 22px 26px; }
+  .recog-side h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 800; margin: 0 0 12px; }
+  .pv-cone { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
+  .pv-cone-row { display: flex; align-items: center; }
+  .pv-cone-stage { color: #fff; padding: 9px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; flex: 1; min-height: 32px; margin: 0 auto; }
+  .pv-cone-stage .marc { font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 3px; background: rgba(255,255,255,0.22); margin-left: 4px; letter-spacing: 0.04em; }
+  .pv-cone-empty { padding: 18px; text-align: center; font-size: 11px; color: var(--muted); font-style: italic; border: 1px dashed var(--border); border-radius: 8px; }
+
+  .ajuste-wrap { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; align-items: start; }
+  .ajuste-card { padding: 22px 26px; }
+  .ajuste-card h2 { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 4px; }
+  .ajuste-card .lead { font-size: 12px; color: var(--ink-soft); margin-bottom: 18px; line-height: 1.5; }
+
+  .step { padding: 16px 0; border-bottom: 1px solid var(--border); }
+  .step:last-child { border-bottom: 0; }
+  .step-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .step-head .num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; background: var(--navy); color: #fff; border-radius: 50%; font-size: 11px; font-weight: 800; }
+  .step-head .title { font-size: 13px; font-weight: 800; color: var(--ink); }
+  .step-head .hint { font-size: 11px; color: var(--muted); margin-left: auto; }
+
+  .field { margin-bottom: 10px; }
+  .field label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 800; margin-bottom: 5px; display: block; }
+  .field input, .field select { font-family: inherit; font-size: 13px; padding: 9px 12px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); font-weight: 600; width: 100%; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(26,61,112,0.1); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .fam-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .fam-card { padding: 12px 14px; background: var(--surface-soft); border: 2px solid var(--border); border-radius: 9px; cursor: pointer; transition: all 0.12s; }
+  .fam-card:hover { border-color: var(--ash); }
+  .fam-card.selected { border-color: var(--navy); background: #EFF4FB; }
+  .fam-card .icon { font-size: 18px; line-height: 1; margin-bottom: 6px; }
+  .fam-card .nm { font-size: 12px; font-weight: 800; color: var(--ink); }
+  .fam-card .desc { font-size: 10px; color: var(--ink-soft); margin-top: 3px; }
+
+  .opt-list { display: grid; gap: 6px; }
+  .opt { display: flex; align-items: flex-start; gap: 8px; padding: 9px 12px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 7px; cursor: pointer; transition: all 0.12s; }
+  .opt:hover { border-color: var(--ash); }
+  .opt.selected { border-color: var(--navy); background: #EFF4FB; }
+  .opt .radio { width: 14px; height: 14px; border: 2px solid var(--border); border-radius: 50%; flex-shrink: 0; margin-top: 2px; position: relative; }
+  .opt.selected .radio { border-color: var(--navy); }
+  .opt.selected .radio::after { content: ''; position: absolute; top: 2px; left: 2px; width: 6px; height: 6px; background: var(--navy); border-radius: 50%; }
+  .opt .nm { font-size: 12px; font-weight: 700; color: var(--ink); }
+  .opt .desc { font-size: 10px; color: var(--ink-soft); margin-top: 2px; }
+
+  .etapas-pool { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; background: var(--surface-soft); border-radius: 8px; border: 1px dashed var(--border); margin-bottom: 8px; }
+  .etapa-chip { padding: 6px 11px; font-size: 11px; font-weight: 700; border-radius: 5px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); cursor: pointer; transition: all 0.12s; }
+  .etapa-chip:hover { border-color: var(--navy); color: var(--navy); }
+  .etapa-chip.selected { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .etapas-empty { font-size: 11px; color: var(--muted); text-align: center; padding: 14px; font-style: italic; }
+  .etapas-help { font-size: 11px; color: var(--ink-soft); margin-bottom: 8px; line-height: 1.45; }
+
+  .marc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .metas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .meta-field { background: var(--surface-soft); border-radius: 7px; padding: 8px 12px; }
+  .meta-field label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 800; }
+  .meta-field input { width: 100%; padding: 4px 6px; border: none; background: transparent; font-size: 13px; font-weight: 800; color: var(--ink); font-family: inherit; }
+
+  .preview { padding: 22px 26px; position: sticky; top: 16px; }
+  .preview h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 800; margin: 0 0 6px; }
+  .preview .nome { font-size: 17px; font-weight: 800; color: var(--ink); margin-bottom: 10px; }
+  .preview .nome.empty { color: var(--muted); font-style: italic; font-weight: 600; font-size: 14px; }
+  .preview .pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+  .preview .pill { padding: 4px 9px; background: var(--surface-soft); border-radius: 5px; font-size: 10px; font-weight: 700; color: var(--ink-soft); }
+  .preview .pill.fam { background: var(--navy); color: #fff; }
+  .preview .pill.subobj { background: var(--rocket); color: #fff; }
+  .preview .pill.captura { background: var(--alicerce); color: #fff; }
+  .pv-section { margin-bottom: 18px; }
+  .pv-section h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 800; margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .pv-kpi { display: grid; gap: 6px; }
+  .pv-kpi-row { display: grid; grid-template-columns: 1fr auto; padding: 6px 0; font-size: 11px; color: var(--ink-soft); border-bottom: 1px dashed var(--border); }
+  .pv-kpi-row strong { color: var(--ink); font-weight: 700; }
+  .pv-sum { background: var(--surface-soft); border-radius: 8px; padding: 10px 12px; font-size: 10px; color: var(--ink-soft); line-height: 1.6; font-family: ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+
+  @media (max-width: 1024px) {
+    .conn-wrap, .recog-wrap, .ajuste-wrap { grid-template-columns: 1fr; }
+    .preview { position: static; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-top">
+    <div class="hero-logo">infotráfego <span class="pill">RECONHECIMENTO + AJUSTE DE FUNIL</span></div>
+    <div class="subtitle">conecta fonte de dados · detecta tipo · estrategista confirma ou ajusta</div>
+    <div class="hero-actions">
+      <button class="hero-btn" onclick="resetar()">Recomeçar</button>
+      <button class="hero-btn primary" onclick="salvar()">Salvar funil</button>
+    </div>
+  </div>
+</div>
+
+<div class="step-tabs">
+  <div class="step-tab active" id="tab-1" onclick="goTab(1)"><span class="num">1</span> Conectar fonte</div>
+  <div class="step-tab disabled" id="tab-2" onclick="goTab(2)"><span class="num">2</span> Reconhecimento automático</div>
+  <div class="step-tab disabled" id="tab-3" onclick="goTab(3)"><span class="num">3</span> Ajustar manualmente</div>
+</div>
+
+<div class="main">
+
+  <div class="page active" id="page-1">
+    <div class="conn-wrap">
+      <div class="conn-card">
+        <h2>Conectar fonte de dados</h2>
+        <div class="lead">Aponte de onde vêm os dados do funil. O sistema vai ler os campos disponíveis e classificar o funil automaticamente.</div>
+        <div class="conn-tipo-row">
+          <div class="conn-tipo selected" data-tipo="sheet" onclick="setFonteTipo('sheet')">
+            <div class="icon">▦</div><div class="nm">Google Sheets</div><div class="desc">Planilha de extração</div>
+          </div>
+          <div class="conn-tipo" data-tipo="api" onclick="setFonteTipo('api')">
+            <div class="icon">⌬</div><div class="nm">API externa</div><div class="desc">Meta · GA4 · Kommo</div>
+          </div>
+          <div class="conn-tipo" data-tipo="db" onclick="setFonteTipo('db')">
+            <div class="icon">◰</div><div class="nm">Banco de dados</div><div class="desc">Postgres · Supabase</div>
+          </div>
+        </div>
+        <div class="conn-form" id="conn-form-sheet">
+          <label>URL ou ID da planilha</label>
+          <input type="text" id="conn-sheet-url" value="https://docs.google.com/spreadsheets/d/1abc.../kedma-aplicacao" placeholder="https://docs.google.com/spreadsheets/d/...">
+          <div class="hint">Aceita URL completa ou ID. Service account já tem permissão de leitura.</div>
+        </div>
+        <div class="conn-form" id="conn-form-api" style="display:none;">
+          <label>Endpoint / token</label>
+          <input type="text" placeholder="https://api.facebook.com/v18.0/act_xxx/insights">
+          <div class="hint">Conexão criada uma vez por cliente · reusa em múltiplos funis.</div>
+        </div>
+        <div class="conn-form" id="conn-form-db" style="display:none;">
+          <label>Connection string</label>
+          <input type="text" placeholder="postgres://user:pwd@host:5432/db?table=funil_kedma">
+          <div class="hint">Usa connection pool · não armazena credencial em claro.</div>
+        </div>
+        <div class="conn-actions">
+          <button class="conn-btn primary" onclick="detectarFunil()">Detectar funil automaticamente →</button>
+        </div>
+      </div>
+      <div class="conn-side">
+        <h3>Como funciona</h3>
+        <div class="step"><span class="num">1.</span> Você conecta a fonte (Sheet · API · Banco)</div>
+        <div class="step"><span class="num">2.</span> Sistema lê os campos disponíveis</div>
+        <div class="step"><span class="num">3.</span> Classifica família · sub-objetivo · captura · etapas</div>
+        <div class="step"><span class="num">4.</span> Você confirma ou ajusta manualmente</div>
+        <div class="step"><span class="num">5.</span> Funil pronto · cone · KPIs · tabelas dinâmicas</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-2">
+    <div class="recog-wrap">
+      <div>
+        <div class="recog-card">
+          <div class="recog-head">
+            <h2>Detectado: <span id="recog-titulo">—</span></h2>
+            <div class="status">● confiança alta</div>
+          </div>
+          <div class="recog-section">
+            <div class="lbl">Cliente · Funil (inferido pelo nome da fonte)</div>
+            <div class="val" id="recog-cliente">—</div>
+          </div>
+          <div class="recog-section">
+            <div class="lbl">Classificação automática</div>
+            <div class="recog-pills" id="recog-pills"></div>
+          </div>
+          <div class="recog-section">
+            <div class="lbl">Campos detectados na fonte (viram etapas do cone)</div>
+            <div class="recog-campos" id="recog-campos"></div>
+            <div style="font-size:11px;color:var(--ink-soft);margin-top:8px;line-height:1.5;">
+              Etapas com <span style="display:inline-block;padding:2px 6px;background:var(--rocket);color:#fff;border-radius:4px;font-weight:700;font-size:10px;">MKT</span> e <span style="display:inline-block;padding:2px 6px;background:var(--success);color:#fff;border-radius:4px;font-weight:700;font-size:10px;">COM</span> = onde termina trabalho do marketing e do comercial.
+            </div>
+          </div>
+          <div class="recog-section">
+            <div class="lbl">KPI primário projetado</div>
+            <div class="val" id="recog-kpi-primario">—</div>
+          </div>
+        </div>
+        <div class="recog-actions">
+          <h3>Está certo?</h3>
+          <div class="lead">Se a inferência tá correta, salva direto. Se faltou algo, abre o ajuste manual.</div>
+          <div class="recog-btns">
+            <button class="recog-btn primary" onclick="confirmarReconhecimento()">✓ Confirmar e salvar</button>
+            <button class="recog-btn" onclick="abrirAjuste()">Ajustar manualmente</button>
+          </div>
+        </div>
+      </div>
+      <div class="recog-side">
+        <h3>Preview do funil</h3>
+        <div class="pv-cone" id="recog-cone"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-3">
+    <div class="ajuste-wrap">
+      <div class="ajuste-card">
+        <h2>Ajuste manual</h2>
+        <div class="lead">Wizard pré-preenchido com o que foi inferido. Mude o que precisar.</div>
+
+        <div class="step">
+          <div class="step-head"><span class="num">1</span><span class="title">Identificação</span></div>
+          <div class="field-row">
+            <div class="field"><label>Cliente</label><select id="f-cliente" onchange="atualizarPreview()"><option value="">—</option><option>Aba Acessível</option><option>Carv Group</option><option>Cristina Florentino</option><option>Gisele Luvizuto</option><option>Giulia Molinari</option><option>Grupo Kedma</option><option>Stella Santini</option></select></div>
+            <div class="field"><label>Nome do funil</label><input type="text" id="f-nome" placeholder="ex: Kedma · Aplicação" oninput="atualizarPreview()"></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><span class="num">2</span><span class="title">Família</span></div>
+          <div class="fam-grid">
+            <div class="fam-card" data-fam="distribuicao" onclick="setFamilia('distribuicao')"><div class="icon">◑</div><div class="nm">Distribuição</div><div class="desc">Audiência · sem comercial</div></div>
+            <div class="fam-card" data-fam="captacao" onclick="setFamilia('captacao')"><div class="icon">◆</div><div class="nm">Captação</div><div class="desc">Gera lead pra comercial</div></div>
+            <div class="fam-card" data-fam="venda_direta" onclick="setFamilia('venda_direta')"><div class="icon">◈</div><div class="nm">Venda Direta</div><div class="desc">Checkout</div></div>
+            <div class="fam-card" data-fam="lancamento" onclick="setFamilia('lancamento')"><div class="icon">▲</div><div class="nm">Lançamento</div><div class="desc">Janela de carrinho</div></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><span class="num">3</span><span class="title">Sub-objetivo</span></div>
+          <div class="opt-list" id="subobj-list"><div class="etapas-empty">Selecione família primeiro.</div></div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><span class="num">4</span><span class="title">Modo de captura</span></div>
+          <div class="opt-list" id="captura-list">
+            <div class="opt" data-cap="landing_page" onclick="setCaptura('landing_page')"><div class="radio"></div><div><div class="nm">Landing Page</div><div class="desc">Tem Page View</div></div></div>
+            <div class="opt" data-cap="formulario_nativo" onclick="setCaptura('formulario_nativo')"><div class="radio"></div><div><div class="nm">Formulário Nativo Meta</div><div class="desc">Sem Page View</div></div></div>
+            <div class="opt" data-cap="click_to_whatsapp" onclick="setCaptura('click_to_whatsapp')"><div class="radio"></div><div><div class="nm">Click-to-WhatsApp</div><div class="desc">Direto pra conversa</div></div></div>
+            <div class="opt" data-cap="instagram_dm" onclick="setCaptura('instagram_dm')"><div class="radio"></div><div><div class="nm">Instagram DM</div><div class="desc">CTA pra DM</div></div></div>
+            <div class="opt" data-cap="multi" onclick="setCaptura('multi')"><div class="radio"></div><div><div class="nm">Múltiplos modos</div><div class="desc">Mais de um ponto de entrada</div></div></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><span class="num">5</span><span class="title">Etapas do funil</span></div>
+          <div class="etapas-help">Etapas disponíveis pra essa família. Selecionadas formam o cone.</div>
+          <div class="etapas-pool" id="etapas-pool"><div class="etapas-empty">Selecione família primeiro.</div></div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><span class="num">6</span><span class="title">Marcadores</span></div>
+          <div class="marc-row">
+            <div class="field"><label>Conv. Marketing termina em:</label><select id="f-marc-mkt"><option value="">—</option></select></div>
+            <div class="field"><label>Conv. Comercial termina em:</label><select id="f-marc-com"><option value="">—</option></select></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><span class="num">7</span><span class="title">Metas por etapa</span></div>
+          <div class="metas-grid" id="metas-grid"><div class="etapas-empty" style="grid-column:1/-1">Selecione etapas primeiro.</div></div>
+        </div>
+      </div>
+
+      <div class="preview">
+        <h2>Preview do funil</h2>
+        <div class="nome empty" id="pv-nome">funil sem nome</div>
+        <div class="pills" id="pv-pills"></div>
+        <div class="pv-section">
+          <h3>Funil cone</h3>
+          <div class="pv-cone" id="pv-cone"><div class="pv-cone-empty">configure etapas pra ver o cone</div></div>
+        </div>
+        <div class="pv-section">
+          <h3>KPI primário</h3>
+          <div class="pv-kpi" id="pv-kpi"><div class="pv-kpi-row"><span>—</span><strong>—</strong></div></div>
+        </div>
+        <div class="pv-section">
+          <h3>JSON (pro Pablo)</h3>
+          <div class="pv-sum" id="pv-sum">configure os campos pra gerar...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const SUBOBJ = {
+    distribuicao: [
+      { id: 'c1_atracao', nm: 'C1 · Atração', desc: 'Novos seguidores' },
+      { id: 'c2_nutricao', nm: 'C2 · Nutrição', desc: 'Video views · retenção' },
+      { id: 'c3_levantada', nm: 'C3 · Levantada', desc: 'Engajamento · mensagens' },
+    ],
+    captacao: [
+      { id: 'sessao_estrategica', nm: 'Sessão Estratégica', desc: 'Aplicação → call' },
+      { id: 'aplicacao_direta', nm: 'Aplicação Direta', desc: 'Sem evento' },
+      { id: 'webinario_gratuito', nm: 'Webinário Gratuito', desc: 'Inscrição → assistir → comercial' },
+      { id: 'webinario_pago', nm: 'Webinário Pago', desc: 'Venda ingresso + lead pós' },
+      { id: 'isca_digital', nm: 'Iscas Digitais', desc: 'Ebook · planilha' },
+    ],
+    venda_direta: [
+      { id: 'produto_digital', nm: 'Produto Digital', desc: 'Curso · mentoria' },
+      { id: 'produto_fisico', nm: 'Produto Físico', desc: 'E-commerce' },
+      { id: 'aumento_base', nm: 'Aumento de Base', desc: 'Volume' },
+    ],
+    lancamento: [
+      { id: 'lancamento_semente', nm: 'Semente', desc: 'Curto · base inicial' },
+      { id: 'lancamento_tradicional_3wb', nm: 'Tradicional 3+Webinar', desc: '3 aulas + webinário' },
+      { id: 'lancamento_pago', nm: 'Pago', desc: 'Vende ingresso' },
+    ],
+  };
+
+  const ETAPAS = {
+    distribuicao: [
+      ['impressao','Impressões'],['alcance','Alcance'],['vv_25','VV 25%'],['vv_50','VV 50%'],['vv_75','VV 75%'],['vv_complete','VV 100%'],['engajamento','Engajamento'],['save','Save'],['compartilhamento','Compartilhamento'],['mensagens','Mensagens'],['visita_perfil','Visita perfil'],['seguidores','Novos seguidores'],
+    ],
+    captacao: [
+      ['impressao','Impressões'],['clique','Cliques'],['page_view','Page View'],['vv_75','VV 75%'],['form_iniciado','Form iniciado'],['lead_magnet','Lead Magnet'],['lead','Lead'],['inscricao_evento','Inscrição evento'],['confirmacao_evento','Confirmação'],['assistiu_evento','Assistiu'],['aplicacao_iniciada','Aplicação iniciada'],['aplicacao_completa','Aplicação completa'],['mql','MQL'],['agendamento','Agendamento'],['call_realizada','Call'],['proposta_enviada','Proposta'],['venda','Venda'],
+    ],
+    venda_direta: [
+      ['impressao','Impressões'],['clique','Cliques'],['page_view','Page View'],['vis_produto','Vis. produto'],['add_carrinho','Add carrinho'],['checkout_iniciado','Checkout iniciado'],['checkout','Checkout'],['venda','Venda'],
+    ],
+    lancamento: [
+      ['impressao','Impressões'],['clique','Cliques'],['page_view','Page View'],['inscricao_evento','Inscrição'],['confirmacao_evento','Confirmação'],['aquecimento_view','Aquecimento'],['lembrete_view','Lembrete'],['evento_ao_vivo','Ao vivo'],['replay','Replay'],['carrinho_aberto','Carrinho aberto'],['checkout','Checkout'],['venda','Venda'],
+    ],
+  };
+
+  const KPI_PRIMARIO = {
+    'distribuicao.c1_atracao': [['Novos seguidores'],['Custo por seguidor'],['Alcance'],['CPM']],
+    'distribuicao.c2_nutricao': [['VV 75%'],['Custo por VV 100%'],['Taxa retenção']],
+    'distribuicao.c3_levantada': [['Mensagens'],['Custo por engajamento']],
+    'captacao.sessao_estrategica': [['CPMQL'],['Custo por reunião'],['Show rate'],['Close rate'],['CAC']],
+    'captacao.aplicacao_direta': [['Custo por aplicação'],['CPMQL'],['Taxa aprovação'],['CAC']],
+    'captacao.webinario_gratuito': [['CPL inscrição'],['Show rate'],['Taxa carrinho pós']],
+    'captacao.webinario_pago': [['Custo ingresso'],['ROAS evento'],['Upsell pós']],
+    'captacao.isca_digital': [['CPL'],['Taxa entrega'],['Taxa avanço MQL'],['CAC']],
+    'venda_direta.produto_digital': [['ROAS'],['Taxa compra'],['Ticket médio']],
+    'venda_direta.produto_fisico': [['ROAS'],['Abandono carrinho'],['Ticket'],['CAC']],
+    'venda_direta.aumento_base': [['Volume leads'],['CPL'],['Custo por cliente novo']],
+    'lancamento.lancamento_semente': [['CPL'],['% meta inscritos'],['ROAS pós']],
+    'lancamento.lancamento_tradicional_3wb': [['CPL'],['% meta inscritos'],['Show rate'],['ROAS pós'],['% verba por fase']],
+    'lancamento.lancamento_pago': [['Custo ingresso'],['ROAS evento + pós'],['Conversão pós']],
+  };
+
+  let state = { cliente:'', nome:'', familia:'', sub_objetivo:'', captura:'', etapas:[], marcador_mkt:'', marcador_com:'', metas:{} };
+
+  function detectarFunil() {
+    const url = (document.getElementById('conn-sheet-url')||{}).value || '';
+    let inf;
+    if (/abaflix|perpetuo|venda.direta/i.test(url)) {
+      inf = { cliente:'Aba Acessível', nome:'Abaflix Perpétuo', familia:'venda_direta', sub_objetivo:'produto_digital', captura:'landing_page', etapas:['impressao','clique','page_view','checkout','venda'], marc_mkt:'page_view', marc_com:'venda' };
+    } else if (/distribu|c1|c2|c3/i.test(url)) {
+      inf = { cliente:'Grupo Kedma', nome:'Distribuição C2', familia:'distribuicao', sub_objetivo:'c2_nutricao', captura:'multi', etapas:['impressao','alcance','vv_25','vv_50','vv_75','vv_complete'], marc_mkt:'vv_complete', marc_com:'' };
+    } else {
+      inf = { cliente:'Grupo Kedma', nome:'Aplicação', familia:'captacao', sub_objetivo:'sessao_estrategica', captura:'landing_page', etapas:['impressao','clique','page_view','aplicacao_completa','mql','agendamento','call_realizada','venda'], marc_mkt:'mql', marc_com:'venda' };
+    }
+    state.cliente = inf.cliente; state.nome = inf.nome; state.familia = inf.familia; state.sub_objetivo = inf.sub_objetivo; state.captura = inf.captura;
+    state.etapas = inf.etapas.map(id => { const lbl = (ETAPAS[inf.familia]||[]).find(e=>e[0]===id); return { id, label: lbl?lbl[1]:id }; });
+    state.marcador_mkt = inf.marc_mkt; state.marcador_com = inf.marc_com; state.metas = {};
+    renderRecognition();
+    goTab(2);
+    document.getElementById('tab-1').classList.add('done');
+  }
+
+  function renderRecognition() {
+    const familias = { distribuicao:'Distribuição', captacao:'Captação', venda_direta:'Venda Direta', lancamento:'Lançamento' };
+    const subObj = (SUBOBJ[state.familia]||[]).find(s=>s.id===state.sub_objetivo);
+    const capLbl = { landing_page:'Landing Page', formulario_nativo:'Form Nativo', click_to_whatsapp:'C2W', instagram_dm:'IG DM', multi:'Multi' }[state.captura];
+    document.getElementById('recog-titulo').textContent = `${familias[state.familia]||''} · ${subObj?subObj.nm:''}`;
+    document.getElementById('recog-cliente').textContent = `${state.cliente} · ${state.nome}`;
+    document.getElementById('recog-pills').innerHTML = `<div class="recog-pill">${familias[state.familia]}</div><div class="recog-pill subobj">${subObj?subObj.nm:''}</div><div class="recog-pill captura">${capLbl}</div>`;
+    document.getElementById('recog-campos').innerHTML = state.etapas.map(e => {
+      const cls = state.marcador_mkt===e.id?'marc-mkt': state.marcador_com===e.id?'marc-com':'';
+      const tag = state.marcador_mkt===e.id?' · MKT': state.marcador_com===e.id?' · COM':'';
+      return `<div class="recog-campo ${cls}">${e.label}${tag}</div>`;
+    }).join('');
+    const kpis = KPI_PRIMARIO[`${state.familia}.${state.sub_objetivo}`] || [];
+    document.getElementById('recog-kpi-primario').innerHTML = kpis.length ? kpis.map(([nm])=>nm).join(' · ') : '—';
+    renderConePreview('recog-cone');
+  }
+
+  function renderConePreview(elId) {
+    const el = document.getElementById(elId);
+    if (!state.etapas.length) { el.innerHTML = '<div class="pv-cone-empty">configure etapas</div>'; return; }
+    const n = state.etapas.length;
+    const tons = ['#1A3D70','#2D5A95','#4A78B0','#6D95C8','#2563EB','#D97706','#16A34A'];
+    el.innerHTML = state.etapas.map((e,i) => {
+      const w = 100 - (i*(70/Math.max(1,n-1)));
+      const cor = i===n-1 ? '#16A34A' : tons[Math.min(i,tons.length-1)];
+      const mMkt = state.marcador_mkt===e.id ? '<span class="marc">MKT ◉</span>' : '';
+      const mCom = state.marcador_com===e.id ? '<span class="marc">COM ◉</span>' : '';
+      return `<div class="pv-cone-row"><div class="pv-cone-stage" style="width:${w}%;background:${cor};"><span>${e.label}</span><span>${mMkt}${mCom}</span></div></div>`;
+    }).join('');
+  }
+
+  function confirmarReconhecimento() { alert('Funil salvo (mockup) · backend pelo Pablo.'); }
+
+  function abrirAjuste() {
+    sincronizarWizard();
+    goTab(3);
+    document.getElementById('tab-2').classList.add('done');
+  }
+
+  function sincronizarWizard() {
+    document.getElementById('f-cliente').value = state.cliente;
+    document.getElementById('f-nome').value = state.nome;
+    document.querySelectorAll('.fam-card').forEach(c => c.classList.toggle('selected', c.dataset.fam===state.familia));
+    renderSubobj(); renderEtapas(); renderMarcadores(); renderMetas();
+    document.querySelectorAll('#captura-list .opt').forEach(o => o.classList.toggle('selected', o.dataset.cap===state.captura));
+    atualizarPreview();
+  }
+
+  function setFonteTipo(t) {
+    document.querySelectorAll('.conn-tipo').forEach(c => c.classList.toggle('selected', c.dataset.tipo===t));
+    document.getElementById('conn-form-sheet').style.display = t==='sheet'?'':'none';
+    document.getElementById('conn-form-api').style.display = t==='api'?'':'none';
+    document.getElementById('conn-form-db').style.display = t==='db'?'':'none';
+  }
+
+  function goTab(n) {
+    document.querySelectorAll('.step-tab').forEach((t,i) => t.classList.toggle('active', (i+1)===n));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-'+n).classList.add('active');
+    if (n>=2) document.getElementById('tab-2').classList.remove('disabled');
+    if (n>=3) document.getElementById('tab-3').classList.remove('disabled');
+  }
+
+  function setFamilia(f) {
+    if (state.familia===f) return;
+    state.familia = f; state.sub_objetivo=''; state.etapas=[]; state.marcador_mkt=''; state.marcador_com=''; state.metas={};
+    document.querySelectorAll('.fam-card').forEach(c => c.classList.toggle('selected', c.dataset.fam===f));
+    renderSubobj(); renderEtapas(); renderMarcadores(); renderMetas(); atualizarPreview();
+  }
+
+  function setSubobj(so) {
+    state.sub_objetivo = so;
+    document.querySelectorAll('#subobj-list .opt').forEach(o => o.classList.toggle('selected', o.dataset.so===so));
+    atualizarPreview();
+  }
+
+  function setCaptura(c) {
+    state.captura = c;
+    document.querySelectorAll('#captura-list .opt').forEach(o => o.classList.toggle('selected', o.dataset.cap===c));
+    atualizarPreview();
+  }
+
+  function toggleEtapa(etId, etLabel) {
+    const i = state.etapas.findIndex(e => e.id===etId);
+    if (i>=0) { state.etapas.splice(i,1); delete state.metas[etId]; }
+    else state.etapas.push({ id: etId, label: etLabel });
+    renderEtapas(); renderMarcadores(); renderMetas(); atualizarPreview();
+  }
+
+  function renderSubobj() {
+    const lst = SUBOBJ[state.familia] || [];
+    const c = document.getElementById('subobj-list');
+    if (!lst.length) { c.innerHTML = '<div class="etapas-empty">Selecione família primeiro.</div>'; return; }
+    c.innerHTML = lst.map(s => `<div class="opt ${state.sub_objetivo===s.id?'selected':''}" data-so="${s.id}" onclick="setSubobj('${s.id}')"><div class="radio"></div><div><div class="nm">${s.nm}</div><div class="desc">${s.desc}</div></div></div>`).join('');
+  }
+
+  function renderEtapas() {
+    const lst = ETAPAS[state.familia] || [];
+    const c = document.getElementById('etapas-pool');
+    if (!lst.length) { c.innerHTML = '<div class="etapas-empty">Selecione família primeiro.</div>'; return; }
+    c.innerHTML = lst.map(([id,lbl]) => {
+      const sel = state.etapas.some(e=>e.id===id);
+      return `<div class="etapa-chip ${sel?'selected':''}" onclick="toggleEtapa('${id}', ${JSON.stringify(lbl)})">${lbl}</div>`;
+    }).join('');
+  }
+
+  function renderMarcadores() {
+    const opts = '<option value="">—</option>' + state.etapas.map(e=>`<option value="${e.id}">${e.label}</option>`).join('');
+    const mkt = document.getElementById('f-marc-mkt'); const com = document.getElementById('f-marc-com');
+    mkt.innerHTML = opts; com.innerHTML = opts;
+    if (state.marcador_mkt) mkt.value = state.marcador_mkt;
+    if (state.marcador_com) com.value = state.marcador_com;
+    mkt.onchange = () => { state.marcador_mkt = mkt.value; atualizarPreview(); };
+    com.onchange = () => { state.marcador_com = com.value; atualizarPreview(); };
+  }
+
+  function renderMetas() {
+    const c = document.getElementById('metas-grid');
+    if (!state.etapas.length) { c.innerHTML = '<div class="etapas-empty" style="grid-column:1/-1">Selecione etapas primeiro.</div>'; return; }
+    c.innerHTML = state.etapas.map(e => {
+      const v = (state.metas[e.id] && state.metas[e.id].valor) || '';
+      return `<div class="meta-field"><label>${e.label} · meta</label><input type="text" value="${v}" placeholder="R$ —" oninput="setMeta('${e.id}', this.value)"></div>`;
+    }).join('');
+  }
+
+  function setMeta(etId, val) { state.metas[etId] = { valor: val }; atualizarPreview(); }
+
+  function atualizarPreview() {
+    state.cliente = document.getElementById('f-cliente').value || state.cliente;
+    state.nome = document.getElementById('f-nome').value || state.nome;
+    const pvNome = document.getElementById('pv-nome');
+    pvNome.textContent = state.nome ? `${state.cliente?state.cliente+' · ':''}${state.nome}` : 'funil sem nome';
+    pvNome.classList.toggle('empty', !state.nome);
+    const famNm = { distribuicao:'Distribuição', captacao:'Captação', venda_direta:'Venda Direta', lancamento:'Lançamento' }[state.familia];
+    const soObj = state.sub_objetivo && SUBOBJ[state.familia] ? (SUBOBJ[state.familia].find(s=>s.id===state.sub_objetivo)||{}).nm : '';
+    const capNm = { landing_page:'Landing Page', formulario_nativo:'Form Nativo', click_to_whatsapp:'C2W', instagram_dm:'IG DM', multi:'Multi' }[state.captura];
+    document.getElementById('pv-pills').innerHTML = [
+      famNm ? `<div class="pill fam">${famNm}</div>` : '',
+      soObj ? `<div class="pill subobj">${soObj}</div>` : '',
+      capNm ? `<div class="pill captura">${capNm}</div>` : '',
+    ].join('');
+    renderConePreview('pv-cone');
+    const kpis = KPI_PRIMARIO[`${state.familia}.${state.sub_objetivo}`] || null;
+    const kpiC = document.getElementById('pv-kpi');
+    kpiC.innerHTML = !kpis ? '<div class="pv-kpi-row"><span style="font-style:italic;color:var(--muted)">selecione família + sub-objetivo</span><strong>—</strong></div>' : kpis.map(([nm])=>`<div class="pv-kpi-row"><span>${nm}</span><strong>—</strong></div>`).join('');
+    const sum = document.getElementById('pv-sum');
+    if (!state.familia) { sum.textContent = 'configure os campos pra gerar...'; }
+    else {
+      const cfg = {
+        cliente: state.cliente||null, nome: state.nome||null,
+        familia: state.familia, sub_objetivo: state.sub_objetivo||null,
+        modo_captura: state.captura||null,
+        etapas: state.etapas.map(e=>e.id),
+        marcador_conversao_marketing: state.marcador_mkt||null,
+        marcador_conversao_comercial: state.marcador_com||null,
+        metas: Object.fromEntries(Object.entries(state.metas).filter(([_,v])=>v.valor).map(([k,v])=>[k,v.valor])),
+      };
+      sum.textContent = JSON.stringify(cfg, null, 2);
+    }
+  }
+
+  function resetar() {
+    state = { cliente:'', nome:'', familia:'', sub_objetivo:'', captura:'', etapas:[], marcador_mkt:'', marcador_com:'', metas:{} };
+    document.querySelectorAll('.step-tab').forEach((t,i) => { t.classList.remove('done'); t.classList.toggle('disabled', i>0); });
+    goTab(1);
+  }
+
+  function salvar() {
+    if (!state.familia) { alert('Conecte uma fonte ou ajuste manualmente antes.'); return; }
+    alert('Funil salvo (mockup) · backend pelo Pablo.');
+  }
+</script>
+
+</body>
+</html>

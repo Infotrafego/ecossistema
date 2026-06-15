@@ -1,0 +1,46 @@
+# ═══════════════════════════════════════════════════════════════
+# Ecossistema Infotráfego · Docker Swarm stack (Traefik)
+# ═══════════════════════════════════════════════════════════════
+# Deploy via Portainer (Stacks → Add stack) ou:
+#   docker stack deploy -c docker-stack.yml ecossistema
+#
+# As variáveis ${...} são preenchidas no Portainer (aba "Environment variables")
+# ou num .env ao lado deste arquivo. Veja .env.example pra a lista completa.
+#
+# IMPORTANTE: as vars NEXT_PUBLIC_* são embutidas na imagem em BUILD-TIME (no
+# GitHub Actions). Aqui só entram os segredos de RUNTIME (service role, tokens).
+
+services:
+  ecossistema:
+    image: ${IMAGE:-ghcr.io/infotrafego/ecossistema:latest}
+    environment:
+      # Runtime (server-only) — NUNCA expostos ao browser
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      META_APP_ID: ${META_APP_ID}
+      META_APP_SECRET: ${META_APP_SECRET}
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN}
+      CLICKUP_API_TOKEN: ${CLICKUP_API_TOKEN}
+      # Também disponível em runtime (redirects/SSR); o valor de build manda no client
+      NEXT_PUBLIC_APP_URL: https://ecossistema.servidordainfotrafego.com.br
+    networks:
+      - traefik_public
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=traefik_public"
+        - "traefik.http.routers.ecossistema.rule=Host(`ecossistema.servidordainfotrafego.com.br`)"
+        - "traefik.http.routers.ecossistema.entrypoints=websecure"
+        - "traefik.http.routers.ecossistema.tls=true"
+        - "traefik.http.routers.ecossistema.tls.certresolver=le"
+        - "traefik.http.services.ecossistema.loadbalancer.server.port=3000"
+
+networks:
+  traefik_public:
+    external: true

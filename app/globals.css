@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Paleta oficial Infotráfego */
+    --navy: 26 61 112; /* #1A3D70 */
+    --alicerce: 3 29 49; /* #031D31 */
+    --gray: 147 152 153; /* #939899 */
+    --ash: 199 210 215; /* #C7D2D7 */
+    --ink: 16 19 26; /* #10131A */
+
+    /* Tokens semânticos · modo claro */
+    --bg: 248 250 252;
+    --surface: 255 255 255;
+    --border: 226 232 240;
+    --muted: 100 116 139;
+  }
+
+  .dark {
+    --bg: 11 18 32;
+    --surface: 30 41 59;
+    --border: 51 65 85;
+    --muted: 148 163 184;
+  }
+
+  body {
+    @apply bg-[rgb(var(--bg))] text-ink antialiased;
+    font-family: var(--font-space-grotesk), Inter, system-ui, sans-serif;
+    letter-spacing: -0.005em;
+  }
+
+  .dark body {
+    @apply text-ash;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-lg p-4;
+  }
+
+  .kpi-value {
+    @apply text-2xl font-extrabold tracking-tight;
+  }
+
+  .kpi-label {
+    @apply text-[10px] uppercase tracking-wider font-bold text-[rgb(var(--muted))];
+  }
+}
