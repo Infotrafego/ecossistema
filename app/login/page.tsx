@@ -113,10 +113,6 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
-
-        <p className="text-ash text-xs text-center mt-6">
-          Não tem conta? Pede pro Mickael criar via Supabase Dashboard.
-        </p>
       </div>
     </div>
   );
