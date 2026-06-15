@@ -24,7 +24,7 @@ ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+RUN mkdir -p public && npm run build
 
 # ── 3. runner ───────────────────────────────────────────────────
 FROM node:20-alpine AS runner
