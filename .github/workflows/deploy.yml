@@ -1,8 +1,8 @@
 name: Build & Push (GHCR)
 
 # Builda a imagem Docker e empurra pro GitHub Container Registry a cada push na
-# main. O Swarm (via Portainer) faz pull da imagem. Se PORTAINER_WEBHOOK estiver
-# configurado nos secrets, dispara o redeploy automático ao final.
+# main. Depois, no Portainer, é só dar "Pull and redeploy" na stack pra puxar a
+# imagem nova (ou re-deploy da stack).
 
 on:
   push:
@@ -53,9 +53,3 @@ jobs:
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
-
-      - name: Trigger Portainer redeploy
-        env:
-          WEBHOOK: ${{ secrets.PORTAINER_WEBHOOK }}
-        if: ${{ env.WEBHOOK != '' }}
-        run: curl -fsSL -X POST "$WEBHOOK"
