@@ -28,7 +28,7 @@ export async function BrandBar() {
         <div className="flex flex-col">
           <span className="text-base font-extrabold tracking-tight leading-none">infotráfego</span>
           <span className="text-[10px] text-ash uppercase tracking-wider mt-0.5">
-            Inteligência de Dados
+            Ecossistema
           </span>
         </div>
       </div>
