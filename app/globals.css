@@ -48,4 +48,10 @@
   .kpi-label {
     @apply text-[10px] uppercase tracking-wider font-bold text-[rgb(var(--muted))];
   }
+
+  /* Campos do Construtor de Funil (inputs e selects do wizard) */
+  .input-wizard {
+    @apply w-full px-2.5 py-1.5 bg-[rgb(var(--surface))] border border-[rgb(var(--border))]
+           rounded-md text-xs font-bold outline-none focus:border-navy/50;
+  }
 }

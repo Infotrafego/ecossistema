@@ -1,32 +1,61 @@
+'use client';
+
 /**
- * Stub · publicos
+ * Aba Públicos · ranking de ad sets e detecção de saturação
  *
- * Implementar seguindo padrão da Visão Geral (../page.tsx).
- * Mockup de referência em DRIVE-V2-FASE-2/mockups/app-unificado-v1.5-COMPLETO.html
+ * Referência visual: docs/mockups/creative-intel/index.html (page "publicos").
  */
 
-export default function Page() {
+import { useState } from 'react';
+import { Podium } from '@/components/dashboard/intel/podium';
+import { NotaProjecao } from '@/components/dashboard/intel/nota-projecao';
+import { RankingView, type SortSection } from '@/components/dashboard/intel/ranking-view';
+import { SecondaryRow } from '@/components/dashboard/intel/secondary-row';
+import { PUBLICOS_METRICAS, TOTAL } from '@/data/mock-intel';
+import { ordenar, piores, SORT_LABELS, type SortKey } from '@/lib/intel';
+
+const SORT_SECTIONS: SortSection[] = [
+  { titulo: '▣ Primária', chaves: ['leads', 'mqls', 'agend', 'cpl', 'cpmql', 'conv_lm'] },
+  { titulo: 'Secundária', chaves: ['spend', 'ctr'] },
+];
+
+export default function PublicosPage() {
+  const [sort, setSort] = useState<SortKey>('leads');
+
+  const melhores = ordenar(PUBLICOS_METRICAS, sort).slice(0, 5);
+  const saturados = piores(PUBLICOS_METRICAS, 5);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-extrabold tracking-tight capitalize">
-          publicos
-        </h1>
+      <header>
+        <h1 className="text-xl font-extrabold tracking-tight">Ranking de Públicos</h1>
         <p className="text-sm text-[rgb(var(--muted))] mt-1">
-          Em construção · seguir mockup de referência
+          {PUBLICOS_METRICAS.length} ad sets ativos no funil de aquisição
         </p>
-      </div>
+      </header>
 
-      <div className="card text-center py-12">
-        <p className="text-sm text-[rgb(var(--muted))]">
-          🚧 Stub · implementar conteúdo desta aba seguindo o mockup
-        </p>
-        <p className="text-xs text-[rgb(var(--muted))] mt-2">
-          Mockup: <code className="bg-[rgb(var(--border))] px-1.5 py-0.5 rounded text-[10px]">
-            DRIVE-V2-FASE-2/mockups/app-unificado-v1.5-COMPLETO.html
-          </code>
-        </p>
-      </div>
+      <SecondaryRow total={TOTAL} />
+
+      <Podium
+        melhores={melhores}
+        piores={saturados}
+        metrica={sort}
+        metricaLabel={SORT_LABELS[sort].replace(' ↓ (mais barato)', '').replace(' ↓', '')}
+        tituloMelhores="Top 5 públicos campeões"
+        tituloPiores="Top 5 públicos saturados"
+        legendaPiores="alto gasto, baixa qualificação"
+      />
+
+      <RankingView
+        itens={PUBLICOS_METRICAS}
+        sortSections={SORT_SECTIONS}
+        sortInicial="leads"
+        onSortChange={setSort}
+        placeholderBusca="Buscar público…"
+        substantivo={{ singular: 'público', plural: 'públicos' }}
+      />
+
+      <NotaProjecao />
     </div>
   );
 }
