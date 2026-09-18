@@ -11,6 +11,10 @@ import {
   Megaphone,
   Lightbulb,
   Settings2,
+  Activity,
+  Bot,
+  PenLine,
+  RefreshCw,
   Sun,
   Moon,
   LogOut,
@@ -31,6 +35,21 @@ const NAV = [
       { href: '/dashboard/inteligencia-de-dados/campanhas', label: 'Campanhas', icon: Megaphone },
       { href: '/dashboard/inteligencia-de-dados/otimizacoes', label: 'Análise & Otimizações', icon: Lightbulb },
       { href: '/dashboard/inteligencia-de-dados/construtor-funil', label: 'Construtor de Funil', icon: Settings2 },
+    ],
+  },
+  {
+    group: 'Inteligência IA',
+    items: [
+      { href: '/dashboard/inteligencia-de-dados/assistente', label: 'Assistente', icon: Bot },
+      { href: '/dashboard/inteligencia-de-dados/fadiga', label: 'Fadiga Criativa', icon: Activity },
+      { href: '/dashboard/inteligencia-de-dados/regras', label: 'Regras Automáticas', icon: Settings2 },
+      { href: '/dashboard/inteligencia-de-dados/copy', label: 'Copy IA', icon: PenLine },
+    ],
+  },
+  {
+    group: 'Operação',
+    items: [
+      { href: '/dashboard/inteligencia-de-dados/sync', label: 'Sync Meta Ads', icon: RefreshCw },
     ],
   },
 ];
@@ -69,17 +88,6 @@ export function Sidebar() {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Cliente ativo (placeholder · vamos implementar o seletor depois) */}
-      <div className="px-4 py-3 border-b border-white/10">
-        <div className="text-[10px] uppercase tracking-wider text-ash mb-1">
-          Cliente ativo
-        </div>
-        <button className="w-full text-left px-3 py-2 bg-white/5 hover:bg-white/10 rounded-md text-sm font-bold flex items-center justify-between">
-          <span>Infotráfego</span>
-          <span className="text-ash text-xs">▼</span>
-        </button>
       </div>
 
       {/* Nav */}

@@ -10,6 +10,8 @@
  * são PROJEÇÃO por benchmark até o CRM estar integrado.
  */
 
+import type { EtapaId } from '@/lib/funil';
+
 /** Benchmarks B2B usados nas projeções enquanto o CRM não está integrado. */
 export const BENCHMARKS = {
   showRate: 0.7, // agendamento → reunião realizada
@@ -32,7 +34,7 @@ export type Alerta = 'escalar' | 'ok' | 'atencao' | 'cortar';
 export type Formato = 'Vídeo' | 'Imagem';
 export type Status = 'active' | 'inactive';
 
-/** Linha bruta — o shape que o sync do Meta Ads vai entregar. */
+/** Linha bruta — o shape que o sync do Meta Ads entrega. */
 export interface LinhaBruta {
   id: string;
   nome: string;
@@ -50,6 +52,59 @@ export interface LinhaBruta {
   leads: number;
   mqls: number;
   agend: number;
+  /**
+   * Valores por etapa do funil, como vieram da Meta
+   * (`metrics_daily.stage_values`).
+   *
+   * Os campos acima continuam existindo porque são o vocabulário de captação
+   * que as abas de ranking usam — mas um funil de distribuição ou venda direta
+   * não tem "leads" nem "MQLs". `stages` é o que permite o cone e os KPIs
+   * renderizarem a partir de QUALQUER config sem novo campo por família.
+   */
+  stages?: Partial<Record<EtapaId, number>>;
+  /** Receita medida pela Meta (compras). `null`/ausente = funil sem checkout. */
+  receitaReal?: number;
+}
+
+/**
+ * Onde cada campo legado de `LinhaBruta` mora em `stages`.
+ *
+ * Existe para que um dataset antigo (sem `stages`) continue alimentando o cone
+ * modular, e para que um dataset novo continue alimentando as abas de ranking.
+ */
+const ETAPA_DO_CAMPO: Array<[keyof LinhaBruta, EtapaId]> = [
+  ['impressoes', 'impressao'],
+  ['cliques', 'clique'],
+  ['pageViews', 'page_view'],
+  ['leads', 'lead'],
+  ['mqls', 'mql'],
+  ['agend', 'agendamento'],
+];
+
+/**
+ * Valor de uma etapa numa linha.
+ *
+ * Prioriza `stages` (dado real da Meta) e só cai nos campos legados quando a
+ * etapa não está lá. Devolve `null` — não zero — quando o funil não mede a
+ * etapa: zero significaria "aconteceu nenhuma vez", que é uma afirmação
+ * diferente de "não medimos isso".
+ */
+export function valorDaEtapa(linha: LinhaBruta, etapa: EtapaId): number | null {
+  const doStage = linha.stages?.[etapa];
+  if (typeof doStage === 'number') return doStage;
+
+  const legado = ETAPA_DO_CAMPO.find(([, e]) => e === etapa);
+  if (legado) {
+    const v = linha[legado[0]];
+    if (typeof v === 'number') return v;
+  }
+  return null;
+}
+
+/** Custo por unidade de uma etapa. `null` quando a etapa não teve volume. */
+export function custoPorEtapa(linha: LinhaBruta, etapa: EtapaId): number | null {
+  const v = valorDaEtapa(linha, etapa);
+  return v !== null && v > 0 ? linha.spend / v : null;
 }
 
 /** Linha com todas as métricas derivadas — o que as abas consomem. */
@@ -69,6 +124,9 @@ export interface Metricas extends LinhaBruta {
   cac: number | null;
   roas: number | null;
   ltv: number;
+  /** `false` = venda projetada por benchmark; `true` = reportada pela Meta. */
+  vendaEhReal: boolean;
+  receitaEhReal: boolean;
   alerta: Alerta;
 }
 
@@ -104,9 +162,13 @@ export function classificarAlerta(m: Omit<Metricas, 'alerta'>, metas = METAS_PAD
  * só o shape de `Metricas`.
  */
 export function derivar<T extends LinhaBruta>(linha: T, metas = METAS_PADRAO): T & Metricas {
+  // Venda medida pela Meta (funil de venda direta / lançamento com checkout)
+  // vence a projeção por benchmark — projeção só existe enquanto não há dado.
+  const vendaReal = linha.stages?.compra ?? linha.stages?.venda ?? null;
+
   const reunioes = Math.round(linha.agend * BENCHMARKS.showRate);
-  const vendas = Math.round(reunioes * BENCHMARKS.closeRate);
-  const receita = vendas * BENCHMARKS.ticketMedio;
+  const vendas = vendaReal ?? Math.round(reunioes * BENCHMARKS.closeRate);
+  const receita = linha.receitaReal ?? vendas * BENCHMARKS.ticketMedio;
 
   const base = {
     ...linha,
@@ -124,6 +186,9 @@ export function derivar<T extends LinhaBruta>(linha: T, metas = METAS_PADRAO): T
     cac: div(linha.spend, vendas),
     roas: div(receita, linha.spend),
     ltv: vendas * BENCHMARKS.ticketMedio * BENCHMARKS.ltvMultiplo,
+    // Só é dado real quando a própria Meta reportou venda/receita.
+    vendaEhReal: vendaReal !== null,
+    receitaEhReal: typeof linha.receitaReal === 'number',
   };
 
   return { ...base, alerta: classificarAlerta(base, metas) };
@@ -133,9 +198,26 @@ export function derivarTodas<T extends LinhaBruta>(linhas: T[], metas = METAS_PA
   return linhas.map((l) => derivar(l, metas));
 }
 
-/** Soma um conjunto de linhas num total e deriva as métricas do agregado. */
-export function totalizar(linhas: LinhaBruta[], metas = METAS_PADRAO): Metricas {
-  const soma = linhas.reduce<LinhaBruta>(
+/**
+ * Soma um conjunto de linhas numa linha bruta única.
+ *
+ * Soma `stages` etapa a etapa, não só os campos de captação: sem isso o cone
+ * de um funil de distribuição ou venda direta chegaria vazio no total, já que
+ * as etapas dele não têm campo dedicado em `LinhaBruta`.
+ */
+export function somarLinhas(linhas: LinhaBruta[]): LinhaBruta {
+  const stages: Partial<Record<EtapaId, number>> = {};
+  let receitaReal: number | undefined;
+
+  for (const l of linhas) {
+    for (const [etapa, valor] of Object.entries(l.stages ?? {})) {
+      const id = etapa as EtapaId;
+      stages[id] = (stages[id] ?? 0) + (valor ?? 0);
+    }
+    if (typeof l.receitaReal === 'number') receitaReal = (receitaReal ?? 0) + l.receitaReal;
+  }
+
+  return linhas.reduce<LinhaBruta>(
     (acc, l) => ({
       ...acc,
       spend: acc.spend + l.spend,
@@ -157,9 +239,15 @@ export function totalizar(linhas: LinhaBruta[], metas = METAS_PADRAO): Metricas 
       leads: 0,
       mqls: 0,
       agend: 0,
+      stages,
+      receitaReal,
     },
   );
-  return derivar(soma, metas);
+}
+
+/** Soma um conjunto de linhas num total e deriva as métricas do agregado. */
+export function totalizar(linhas: LinhaBruta[], metas = METAS_PADRAO): Metricas {
+  return derivar(somarLinhas(linhas), metas);
 }
 
 // ── Ordenação ────────────────────────────────────────────────────────────────

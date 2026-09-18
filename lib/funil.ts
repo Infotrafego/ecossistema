@@ -7,6 +7,10 @@
  * determinística (regras sobre os nomes dos campos da fonte), não ML.
  *
  * Fonte das regras: BRIEFING_01_INTELIGENCIA_DE_DADOS.md (revisão 12/05/2026).
+ *
+ * ⚠ Os ids de `EtapaId` e `ModoCaptura` são CONTRATO com o banco: a migration
+ * 20260918000000_taxonomia_funil.sql amarra os CHECKs de `funis` exatamente a
+ * estes valores. Mudar um id aqui exige migration de dados junto.
  */
 
 export type Familia = 'distribuicao' | 'captacao' | 'venda_direta' | 'lancamento';
@@ -35,15 +39,15 @@ export type EtapaId =
   // captação
   | 'form_iniciado' | 'lead' | 'lead_magnet'
   | 'aplicacao_iniciada' | 'aplicacao_completa'
-  | 'inscricao_evento' | 'evento_ao_vivo' | 'replay_view'
+  | 'inscricao_evento' | 'confirmacao_evento' | 'evento_ao_vivo' | 'assistiu_evento' | 'replay'
   | 'mql'
   // comercial
-  | 'lead_qualificado' | 'agendamento' | 'reuniao_realizada' | 'no_show'
+  | 'lead_qualificado' | 'agendamento' | 'call_realizada' | 'no_show'
   | 'proposta_enviada' | 'venda'
   // venda direta
-  | 'add_carrinho' | 'checkout' | 'compra'
+  | 'vis_produto' | 'add_carrinho' | 'checkout_iniciado' | 'compra'
   // distribuição
-  | 'seguidores' | 'engajamento' | 'mensagens' | 'salvamentos'
+  | 'seguidores' | 'visita_perfil' | 'engajamento' | 'mensagens' | 'save' | 'compartilhamento'
   // lançamento
   | 'aquecimento_view' | 'lembrete_view' | 'carrinho_aberto';
 
@@ -79,6 +83,11 @@ export const SUBOBJETIVOS: Record<Familia, Array<{ id: SubObjetivo; nome: string
   ],
 };
 
+/** Todos os sub-objetivos válidos, achatados — usado na validação do server. */
+export const SUBOBJETIVOS_VALIDOS: SubObjetivo[] = Object.values(SUBOBJETIVOS).flatMap((lista) =>
+  lista.map((s) => s.id),
+);
+
 export const CAPTURAS: Record<ModoCaptura, { nome: string; desc: string }> = {
   landing_page: { nome: 'Landing Page', desc: 'Tem Page View' },
   formulario_nativo: { nome: 'Formulário Nativo Meta', desc: 'Sem Page View' },
@@ -94,10 +103,12 @@ interface EtapaDef {
   grupo: 'mídia' | 'captação' | 'comercial' | 'venda' | 'audiência';
 }
 
+const TODAS: Familia[] = ['distribuicao', 'captacao', 'venda_direta', 'lancamento'];
+
 export const ETAPAS: Record<EtapaId, EtapaDef> = {
-  impressao: { label: 'Impressões', familias: ['distribuicao', 'captacao', 'venda_direta', 'lancamento'], grupo: 'mídia' },
-  alcance: { label: 'Alcance', familias: ['distribuicao', 'captacao', 'venda_direta', 'lancamento'], grupo: 'mídia' },
-  clique: { label: 'Cliques', familias: ['distribuicao', 'captacao', 'venda_direta', 'lancamento'], grupo: 'mídia' },
+  impressao: { label: 'Impressões', familias: TODAS, grupo: 'mídia' },
+  alcance: { label: 'Alcance', familias: TODAS, grupo: 'mídia' },
+  clique: { label: 'Cliques', familias: TODAS, grupo: 'mídia' },
   page_view: { label: 'Page View', familias: ['captacao', 'venda_direta', 'lancamento'], grupo: 'mídia' },
   vv_25: { label: 'Video View 25%', familias: ['distribuicao', 'lancamento'], grupo: 'mídia' },
   vv_50: { label: 'Video View 50%', familias: ['distribuicao', 'lancamento'], grupo: 'mídia' },
@@ -110,33 +121,47 @@ export const ETAPAS: Record<EtapaId, EtapaDef> = {
   aplicacao_iniciada: { label: 'Aplicação iniciada', familias: ['captacao'], grupo: 'captação' },
   aplicacao_completa: { label: 'Aplicação completa', familias: ['captacao'], grupo: 'captação' },
   inscricao_evento: { label: 'Inscrição no evento', familias: ['captacao', 'lancamento'], grupo: 'captação' },
+  confirmacao_evento: { label: 'Confirmação de presença', familias: ['captacao', 'lancamento'], grupo: 'captação' },
   evento_ao_vivo: { label: 'Presença ao vivo', familias: ['captacao', 'lancamento'], grupo: 'captação' },
-  replay_view: { label: 'Replay assistido', familias: ['captacao', 'lancamento'], grupo: 'captação' },
+  assistiu_evento: { label: 'Assistiu o evento', familias: ['captacao', 'lancamento'], grupo: 'captação' },
+  replay: { label: 'Replay assistido', familias: ['captacao', 'lancamento'], grupo: 'captação' },
   mql: { label: 'MQL', familias: ['captacao', 'lancamento'], grupo: 'captação' },
 
   lead_qualificado: { label: 'Lead qualificado (SQL)', familias: ['captacao'], grupo: 'comercial' },
   agendamento: { label: 'Reunião agendada', familias: ['captacao'], grupo: 'comercial' },
-  reuniao_realizada: { label: 'Reunião realizada', familias: ['captacao'], grupo: 'comercial' },
+  call_realizada: { label: 'Reunião realizada', familias: ['captacao'], grupo: 'comercial' },
   no_show: { label: 'No-show', familias: ['captacao'], grupo: 'comercial' },
   proposta_enviada: { label: 'Proposta enviada', familias: ['captacao'], grupo: 'comercial' },
   venda: { label: 'Venda / contrato', familias: ['captacao', 'venda_direta', 'lancamento'], grupo: 'comercial' },
 
+  vis_produto: { label: 'Visualização de produto', familias: ['venda_direta'], grupo: 'venda' },
   add_carrinho: { label: 'Adicionar ao carrinho', familias: ['venda_direta'], grupo: 'venda' },
-  checkout: { label: 'Checkout iniciado', familias: ['venda_direta', 'lancamento'], grupo: 'venda' },
+  checkout_iniciado: { label: 'Checkout iniciado', familias: ['venda_direta', 'lancamento'], grupo: 'venda' },
   compra: { label: 'Compra', familias: ['venda_direta'], grupo: 'venda' },
 
   seguidores: { label: 'Novos seguidores', familias: ['distribuicao'], grupo: 'audiência' },
+  visita_perfil: { label: 'Visitas ao perfil', familias: ['distribuicao'], grupo: 'audiência' },
   engajamento: { label: 'Engajamento', familias: ['distribuicao'], grupo: 'audiência' },
   mensagens: { label: 'Mensagens iniciadas', familias: ['distribuicao'], grupo: 'audiência' },
-  salvamentos: { label: 'Salvamentos', familias: ['distribuicao'], grupo: 'audiência' },
+  save: { label: 'Salvamentos', familias: ['distribuicao'], grupo: 'audiência' },
+  compartilhamento: { label: 'Compartilhamentos', familias: ['distribuicao'], grupo: 'audiência' },
 
   aquecimento_view: { label: 'Aula de aquecimento', familias: ['lancamento'], grupo: 'captação' },
   lembrete_view: { label: 'Lembrete visto', familias: ['lancamento'], grupo: 'captação' },
   carrinho_aberto: { label: 'Carrinho aberto', familias: ['lancamento'], grupo: 'venda' },
 };
 
+export const ETAPAS_VALIDAS = Object.keys(ETAPAS) as EtapaId[];
+
+export function isEtapaId(v: string): v is EtapaId {
+  return Object.prototype.hasOwnProperty.call(ETAPAS, v);
+}
+
 export interface ConfigFunil {
+  id?: string;
   cliente: string;
+  /** client_id do Supabase — preenchido quando a config vem do/vai pro banco. */
+  clientId?: string;
   nome: string;
   familia: Familia | null;
   subObjetivo: SubObjetivo | null;
@@ -176,12 +201,13 @@ export interface Reconhecimento {
 const ORDEM: EtapaId[] = [
   'impressao', 'alcance', 'clique', 'page_view',
   'vv_25', 'vv_50', 'vv_75', 'vv_complete',
-  'seguidores', 'engajamento', 'salvamentos', 'mensagens',
+  'visita_perfil', 'seguidores', 'engajamento', 'save', 'compartilhamento', 'mensagens',
   'form_iniciado', 'lead_magnet', 'lead',
-  'inscricao_evento', 'aquecimento_view', 'lembrete_view', 'evento_ao_vivo', 'replay_view',
+  'inscricao_evento', 'confirmacao_evento', 'aquecimento_view', 'lembrete_view',
+  'evento_ao_vivo', 'assistiu_evento', 'replay',
   'aplicacao_iniciada', 'aplicacao_completa', 'mql',
-  'lead_qualificado', 'agendamento', 'reuniao_realizada', 'no_show', 'proposta_enviada',
-  'add_carrinho', 'carrinho_aberto', 'checkout', 'compra', 'venda',
+  'lead_qualificado', 'agendamento', 'call_realizada', 'no_show', 'proposta_enviada',
+  'vis_produto', 'add_carrinho', 'carrinho_aberto', 'checkout_iniciado', 'compra', 'venda',
 ];
 
 export function ordenarEtapas(etapas: EtapaId[]): EtapaId[] {
@@ -204,9 +230,9 @@ function classificar(campos: Set<EtapaId>): { familia: Familia; subObjetivo: Sub
     return { familia: 'lancamento', subObjetivo: 'lancamento_tradicional_3wb' };
   if (tem('inscricao_evento', 'evento_ao_vivo', 'venda'))
     return { familia: 'captacao', subObjetivo: 'webinario_gratuito' };
-  if (tem('add_carrinho', 'checkout'))
+  if (tem('add_carrinho', 'checkout_iniciado'))
     return { familia: 'venda_direta', subObjetivo: 'produto_fisico' };
-  if (tem('checkout') && !campos.has('mql'))
+  if (tem('checkout_iniciado') && !campos.has('mql'))
     return { familia: 'venda_direta', subObjetivo: 'produto_digital' };
   if (tem('aplicacao_completa', 'mql'))
     return { familia: 'captacao', subObjetivo: 'aplicacao_direta' };
@@ -289,7 +315,7 @@ export const FONTES_EXEMPLO: Array<{
     rotulo: 'Infotráfego · Aquisição de clientes',
     cliente: 'Infotráfego',
     nome: 'Aquisição de Clientes',
-    campos: ['impressao', 'clique', 'page_view', 'form_iniciado', 'aplicacao_completa', 'mql', 'lead_qualificado', 'agendamento', 'reuniao_realizada', 'proposta_enviada', 'venda'],
+    campos: ['impressao', 'clique', 'page_view', 'form_iniciado', 'aplicacao_completa', 'mql', 'lead_qualificado', 'agendamento', 'call_realizada', 'proposta_enviada', 'venda'],
   },
   {
     chave: 'kedma-isca',
@@ -303,13 +329,13 @@ export const FONTES_EXEMPLO: Array<{
     rotulo: 'Stella Santini · Distribuição C2',
     cliente: 'Stella Santini',
     nome: 'Nutrição de audiência',
-    campos: ['impressao', 'alcance', 'vv_25', 'vv_50', 'vv_75', 'vv_complete', 'salvamentos'],
+    campos: ['impressao', 'alcance', 'vv_25', 'vv_50', 'vv_75', 'vv_complete', 'save'],
   },
   {
     chave: 'carv-checkout',
     rotulo: 'Carv Group · Produto digital',
     cliente: 'Carv Group',
     nome: 'Venda direta · Mentoria',
-    campos: ['impressao', 'clique', 'page_view', 'checkout', 'compra', 'venda'],
+    campos: ['impressao', 'clique', 'page_view', 'vis_produto', 'checkout_iniciado', 'compra', 'venda'],
   },
 ];

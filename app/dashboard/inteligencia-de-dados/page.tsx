@@ -1,202 +1,207 @@
 /**
- * Visão Geral · Inteligência de Dados (Fase 2 · cliente piloto: Infotráfego)
+ * Visão Geral · Inteligência de Dados
  *
- * Esta página está MOCKADA com dados fake pra você ver o esqueleto.
- * Quando implementar o sync Meta Ads real, troca os imports do mock-metrics
- * por queries reais no Supabase.
+ * Referência visual: docs/mockups/creative-intel/index.html (`data-page="overview"`).
+ * Ordem das seções igual à do mockup: metas → orçamento → cone → séries →
+ * tabelas diárias → distribuições → jornada → alertas.
+ *
+ * Tudo aqui é derivado da config do funil selecionado. Trocar o funil no filtro
+ * do topo troca os KPIs, as etapas do cone e o eixo de distribuição — sem
+ * nenhum ramo `if (cliente === 'X')` no caminho.
  */
 
-import { KpiCard } from '@/components/dashboard/kpi-card';
+import { cardsDoTopo, montarCone, projecoesComerciais } from '@/lib/cone';
+import { resolverContexto } from '@/lib/data/contexto';
+import { getDadosIntel } from '@/lib/data/intel';
+import { getMetasDoMes, getOrcamento, montarMetas } from '@/lib/data/metas';
+import { getResumoSync } from '@/lib/data/sync';
+import { alertasAtivos } from '@/lib/analise';
+import { BENCHMARKS, fmtMoeda, fmtNum, type Metricas } from '@/lib/intel';
+import { calcularMeta, calcularOrcamento, diasNoMes } from '@/lib/orcamento';
+import { eixoDeDistribuicao, ROTULO_EIXO } from '@/lib/funil-kpis';
+import { periodoAnterior, type ParamsBrutos } from '@/lib/filtros';
 import { FunilCone } from '@/components/dashboard/funil-cone';
+import { KpiRow } from '@/components/dashboard/overview/kpi-row';
+import { SeriesTemporaisLazy } from '@/components/dashboard/overview/series-lazy';
+import { TabelasDiarias } from '@/components/dashboard/overview/tabelas-diarias';
 import {
-  mockKpis,
-  mockReceita,
-  mockFunilEtapas,
-  mockMetas,
-  mockSaldoOrcamento,
-  mockMulticanal,
-  mockVisaoDiaria,
-} from '@/data/mock-metrics';
-import { formatCurrency, formatNumber, formatPercent } from '@/lib/utils';
+  AlertasAtivos,
+  Distribuicoes,
+  Jornada,
+  PainelMetas,
+  PainelOrcamento,
+} from '@/components/dashboard/overview/paineis';
+import { EstadoVazio, motivoDoVazio } from '@/components/dashboard/intel/estado-vazio';
+import { NotaProjecao } from '@/components/dashboard/intel/nota-projecao';
 
-export default function VisaoGeralPage() {
+export const dynamic = 'force-dynamic';
+
+const MESES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
+
+export default async function VisaoGeralPage({
+  searchParams,
+}: {
+  searchParams: Promise<ParamsBrutos>;
+}) {
+  const ctx = await resolverContexto(await searchParams);
+  if (!ctx.cliente) return <EstadoVazio motivo="sem_acesso" />;
+
+  const filtros = {
+    clientId: ctx.cliente.id,
+    funilId: ctx.filtros.funilId,
+    desde: ctx.filtros.desde,
+    ate: ctx.filtros.ate,
+  };
+
+  const anterior = periodoAnterior(ctx.filtros);
+
+  const [dados, dadosAnteriores] = await Promise.all([
+    getDadosIntel(filtros),
+    // Só pro delta dos KPIs. Falhar aqui não pode derrubar a página: sem base
+    // de comparação a tela ainda vale, só perde as setinhas.
+    getDadosIntel({ ...filtros, desde: anterior.desde, ate: anterior.ate }).catch(() => null),
+  ]);
+
+  if (dados.vazio) {
+    const { houveSync } = await getResumoSync(ctx.cliente.id, 5);
+    return (
+      <EstadoVazio
+        motivo={motivoDoVazio({ semAcesso: false, contaMeta: ctx.cliente.contaMeta, houveSync })}
+      />
+    );
+  }
+
+  // O painel mensal segue o mês do FIM do período: se o gestor olha "últimos 30
+  // dias" no dia 5 de outubro, a régua de metas que interessa é a de outubro.
+  const fim = new Date(`${ctx.filtros.ate}T00:00:00Z`);
+  const ano = fim.getUTCFullYear();
+  const mes = fim.getUTCMonth() + 1;
+  const diasDoMes = diasNoMes(ano, mes);
+  const diasDecorridos = fim.getUTCDate();
+  const mesLabel = `${MESES[mes - 1]}/${String(ano).slice(2)}`;
+
+  const [orcamentoConfig, metasConfig, dadosDoMes] = await Promise.all([
+    getOrcamento(ctx.cliente.id, ano, mes),
+    getMetasDoMes(ctx.filtros.funilId, ano, mes),
+    // Metas e verba são MENSAIS; comparar com o gasto de um período de 7 dias
+    // daria um "ritmo" sem sentido. Então o painel do mês lê o mês inteiro,
+    // independente do filtro de período.
+    getDadosIntel({
+      ...filtros,
+      desde: `${ano}-${String(mes).padStart(2, '0')}-01`,
+      ate: ctx.filtros.ate,
+    }).catch(() => null),
+  ]);
+
+  const totalDoMes: Metricas = dadosDoMes?.total ?? dados.total;
+
+  const orcamento = calcularOrcamento({
+    tipo: orcamentoConfig.tipo,
+    verbaMensal: orcamentoConfig.verbaMensal,
+    saldoPrepago: orcamentoConfig.saldoPrepago,
+    gastoMtd: totalDoMes.spend,
+    diasDecorridos,
+    diasDoMes,
+  });
+
+  const metas = montarMetas(dados.funil, metasConfig, totalDoMes).map((m) =>
+    calcularMeta(m, diasDecorridos, diasDoMes),
+  );
+
+  const cone = dados.funil
+    ? montarCone(dados.funil, dados.total, {
+        projecoes: projecoesComerciais(dados.total, {
+          showRate: BENCHMARKS.showRate,
+          closeRate: BENCHMARKS.closeRate,
+        }),
+      })
+    : [];
+
+  const cards = cardsDoTopo(dados.funil?.familia ?? null, dados.total, {
+    moeda: fmtMoeda,
+    num: fmtNum,
+  });
+
+  const alertas = alertasAtivos(dados.criativos);
+  const eixo = eixoDeDistribuicao(dados.funil?.familia ?? null);
+
   return (
-    <div className="space-y-6">
-      {/* Headline */}
-      <div>
+    <div className="space-y-7">
+      <header>
         <h1 className="text-xl font-extrabold tracking-tight">Visão Geral</h1>
         <p className="text-sm text-[rgb(var(--muted))] mt-1">
-          Funil de aquisição da Infotráfego · últimos 30 dias
+          {ctx.cliente.nome}
+          {dados.funil ? ` · ${dados.funil.nome}` : ' · todos os funis'} ·{' '}
+          {ctx.filtros.desde.split('-').reverse().join('/')} a{' '}
+          {ctx.filtros.ate.split('-').reverse().join('/')}
         </p>
-      </div>
+      </header>
 
-      {/* KPIs · 8 boxes */}
-      <section>
-        <h2 className="text-xs uppercase tracking-wider font-bold text-[rgb(var(--muted))] mb-3">
-          Métricas do funil
+      <PainelMetas
+        metas={metas}
+        diasDecorridos={diasDecorridos}
+        diasDoMes={diasDoMes}
+        mesLabel={mesLabel}
+      />
+
+      <PainelOrcamento
+        orcamento={orcamento}
+        configurado={orcamentoConfig.configurado}
+        mesLabel={mesLabel}
+      />
+
+      <KpiRow funil={dados.funil} total={dados.total} anterior={dadosAnteriores?.total ?? null} />
+
+      <section className="space-y-3">
+        <h2 className="text-xs uppercase tracking-wider font-bold text-[rgb(var(--muted))]">
+          Funil completo · taxas de conversão e custo por etapa
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <KpiCard label="Impressões" value={mockKpis.impressoes.value} format="number" delta={mockKpis.impressoes.delta} />
-          <KpiCard label="Cliques" value={mockKpis.cliques.value} format="number" delta={mockKpis.cliques.delta} />
-          <KpiCard label="Page Views" value={mockKpis.pageViews.value} format="number" delta={mockKpis.pageViews.delta} />
-          <KpiCard label="Form Iniciado" value={mockKpis.formIniciado.value} format="number" delta={mockKpis.formIniciado.delta} />
-          <KpiCard label="MQLs" value={mockKpis.formCompleto.value} format="number" delta={mockKpis.formCompleto.delta} />
-          <KpiCard label="SQLs" value={mockKpis.leadQualificado.value} format="number" delta={mockKpis.leadQualificado.delta} />
-          <KpiCard label="Reuniões" value={mockKpis.reunioesAgendadas.value} format="number" delta={mockKpis.reunioesAgendadas.delta} />
-          <KpiCard label="Vendas" value={mockKpis.vendas.value} format="number" delta={mockKpis.vendas.delta} emphasis="primary" />
-        </div>
-
-        {/* Receita destacada */}
-        <div className="mt-3">
-          <KpiCard
-            label="Receita do período"
-            value={mockReceita.total}
-            format="currency"
-            delta={mockReceita.delta}
-            emphasis="primary"
-          />
-        </div>
-      </section>
-
-      {/* Acompanhamento de Metas */}
-      <section>
-        <h2 className="text-xs uppercase tracking-wider font-bold text-[rgb(var(--muted))] mb-3">
-          Acompanhamento de Metas
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {Object.entries(mockMetas).map(([key, m]) => (
-            <MetaCard key={key} label={labelMeta(key)} meta={m.meta} atual={m.atual} pace={m.pace} />
-          ))}
-        </div>
-      </section>
-
-      {/* Funil cone Looker (CRÍTICO) */}
-      <section>
-        <h2 className="text-xs uppercase tracking-wider font-bold text-[rgb(var(--muted))] mb-3">
-          Funil cone · Aquisição de Clientes
-        </h2>
-        <div className="card">
-          <FunilCone etapas={mockFunilEtapas} />
-        </div>
-      </section>
-
-      {/* Saldo & Orçamento + Multicanal lado a lado */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <section>
-          <h2 className="text-xs uppercase tracking-wider font-bold text-[rgb(var(--muted))] mb-3">
-            Saldo & Orçamento
-          </h2>
-          <div className="card space-y-3">
-            <Row label="Budget mensal" value={formatCurrency(mockSaldoOrcamento.budgetMensal)} />
-            <Row label="Gasto até hoje" value={formatCurrency(mockSaldoOrcamento.gastoAteHoje)} />
-            <Row label="Saldo restante" value={formatCurrency(mockSaldoOrcamento.saldoRestante)} strong />
-            <Row label="Projeção fim de mês" value={formatCurrency(mockSaldoOrcamento.projecaoFimMes)} />
-            <Row label="Dias úteis restantes" value={String(mockSaldoOrcamento.diasUteisRestantes)} />
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-xs uppercase tracking-wider font-bold text-[rgb(var(--muted))] mb-3">
-            Painel Multicanal
-          </h2>
-          <div className="card space-y-2">
-            {mockMulticanal.map((c) => (
-              <div key={c.canal} className="flex items-center justify-between py-1">
-                <div className="text-sm font-bold">{c.canal}</div>
-                <div className="flex items-center gap-4 text-xs">
-                  <span className="text-[rgb(var(--muted))]">
-                    {formatCurrency(c.spend)}
-                  </span>
-                  <span className="font-bold">{c.conversoes} conv.</span>
-                  <span className="text-[rgb(var(--muted))]">{formatPercent(c.share)}</span>
+        <div className="card space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            {cards.map((c) => (
+              <div
+                key={c.label}
+                className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--bg))] px-3 py-2"
+              >
+                <div className="kpi-label">{c.label}</div>
+                <div className="text-lg font-extrabold tracking-tight tabular-nums mt-0.5">
+                  {c.valor}
                 </div>
+                <div className="text-[10px] text-[rgb(var(--muted))]">{c.sub}</div>
               </div>
             ))}
           </div>
-        </section>
-      </div>
 
-      {/* Tabela diária */}
-      <section>
-        <h2 className="text-xs uppercase tracking-wider font-bold text-[rgb(var(--muted))] mb-3">
-          Visão Diária · últimos 7 dias
-        </h2>
-        <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-[10px] uppercase tracking-wider text-[rgb(var(--muted))] font-bold border-b border-[rgb(var(--border))]">
-                <th className="py-2 px-2">Data</th>
-                <th className="py-2 px-2 text-right">Impressões</th>
-                <th className="py-2 px-2 text-right">Cliques</th>
-                <th className="py-2 px-2 text-right">Gasto</th>
-                <th className="py-2 px-2 text-right">Conversões</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mockVisaoDiaria.map((d) => (
-                <tr key={d.date} className="border-b border-[rgb(var(--border))] last:border-0">
-                  <td className="py-2 px-2 font-bold">{formatDate(d.date)}</td>
-                  <td className="py-2 px-2 text-right">{formatNumber(d.impressoes)}</td>
-                  <td className="py-2 px-2 text-right">{formatNumber(d.cliques)}</td>
-                  <td className="py-2 px-2 text-right">{formatCurrency(d.spend)}</td>
-                  <td className="py-2 px-2 text-right font-bold">{d.conversoes}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {cone.length > 0 ? (
+            <FunilCone etapas={cone} />
+          ) : (
+            <p className="text-[11px] text-[rgb(var(--muted))] py-4 text-center">
+              Selecione um funil no filtro do topo pra desenhar o cone. As etapas vêm da config
+              cadastrada no Construtor.
+            </p>
+          )}
         </div>
       </section>
 
-      {/* Nota */}
-      <div className="bg-attention-bg border border-attention/30 text-attention rounded-lg p-4 text-xs">
-        <strong>⚠ Dados mockados:</strong> esta página usa dados fake em{' '}
-        <code className="bg-white/30 px-1 rounded">data/mock-metrics.ts</code>. Quando o sync
-        Meta Ads real estiver implementado, substituir por queries no Supabase.
-      </div>
+      <SeriesTemporaisLazy diario={dados.diario} />
+
+      <TabelasDiarias diario={dados.diario} />
+
+      <Distribuicoes
+        campanhas={dados.campanhas}
+        publicos={dados.publicos}
+        criativos={dados.criativos}
+        rotuloEixo={ROTULO_EIXO[eixo]}
+      />
+
+      <Jornada total={dados.total} />
+
+      <AlertasAtivos alertas={alertas} />
+
+      <NotaProjecao />
     </div>
   );
-}
-
-function MetaCard({ label, meta, atual, pace }: { label: string; meta: number; atual: number; pace: number }) {
-  const pct = Math.min(pace, 1.5); // cap visual em 150%
-  const color = pace >= 1 ? 'bg-success' : pace >= 0.7 ? 'bg-attention' : 'bg-warn';
-  return (
-    <div className="card">
-      <div className="kpi-label">{label}</div>
-      <div className="flex items-baseline gap-2 mt-1">
-        <span className="text-xl font-extrabold">{formatNumber(atual)}</span>
-        <span className="text-xs text-[rgb(var(--muted))]">/ {formatNumber(meta)}</span>
-      </div>
-      <div className="h-2 bg-[rgb(var(--border))] rounded-full mt-2 overflow-hidden">
-        <div className={`h-full ${color} transition-all`} style={{ width: `${Math.min(pct * 100, 150)}%` }} />
-      </div>
-      <div className="text-[10px] text-[rgb(var(--muted))] mt-1.5 font-bold">
-        {formatPercent(pace)} da meta
-      </div>
-    </div>
-  );
-}
-
-function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex justify-between items-center text-sm">
-      <span className="text-[rgb(var(--muted))]">{label}</span>
-      <span className={strong ? 'font-extrabold text-base' : 'font-bold'}>{value}</span>
-    </div>
-  );
-}
-
-function labelMeta(key: string): string {
-  const map: Record<string, string> = {
-    leadsMes: 'Leads/mês',
-    reunioesMes: 'Reuniões/mês',
-    vendasMes: 'Vendas/mês',
-    ticketMedio: 'Ticket médio',
-  };
-  return map[key] || key;
-}
-
-function formatDate(iso: string): string {
-  const [, m, d] = iso.split('-');
-  return `${d}/${m}`;
 }

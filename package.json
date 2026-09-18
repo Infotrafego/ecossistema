@@ -8,6 +8,12 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "verificar": "node scripts/run.cjs scripts/verificar/nucleo.ts && node scripts/run.cjs scripts/verificar/ia.ts",
+    "conferir": "node scripts/run.cjs scripts/verificar/conferencia-abas.ts",
+    "meta:acesso": "node scripts/run.cjs scripts/sync-manual.ts --acesso",
+    "meta:diagnostico": "node scripts/run.cjs scripts/diagnostico-meta.ts",
+    "meta:sync": "node scripts/run.cjs scripts/sync-manual.ts",
+    "fadiga": "node scripts/run.cjs scripts/rodar-fadiga.ts",
     "db:push": "supabase db push",
     "db:seed": "supabase db reset",
     "db:types": "supabase gen types typescript --local > types/database.ts"

@@ -11,6 +11,9 @@ const nextConfig = {
     ],
   },
   experimental: {
+    // Necessario pro instrumentation.ts, que sobe o agendador do sync diario
+    // junto com o servidor (ver lib/meta-ads/agendador.ts).
+    instrumentationHook: true,
     serverActions: {
       allowedOrigins: [
         'localhost:3000',

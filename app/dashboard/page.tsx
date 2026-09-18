@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { BarChart3, Settings2 } from 'lucide-react';
+import { BarChart3, Bot, RefreshCw, Settings2 } from 'lucide-react';
 
 export default function DashboardHome() {
   return (
@@ -39,10 +39,38 @@ export default function DashboardHome() {
             Abrir →
           </span>
         </Link>
+
+        <Link
+          href="/dashboard/inteligencia-de-dados/assistente"
+          className="card hover:border-navy transition group"
+        >
+          <Bot className="text-navy mb-3" size={24} />
+          <h3 className="font-extrabold tracking-tight">Assistente IA</h3>
+          <p className="text-sm text-[rgb(var(--muted))] mt-1">
+            Comandos em português viram ações na Meta · com confirmação antes de executar
+          </p>
+          <span className="text-xs text-navy font-bold mt-3 inline-block group-hover:underline">
+            Abrir →
+          </span>
+        </Link>
+
+        <Link
+          href="/dashboard/inteligencia-de-dados/sync"
+          className="card hover:border-navy transition group"
+        >
+          <RefreshCw className="text-navy mb-3" size={24} />
+          <h3 className="font-extrabold tracking-tight">Sync Meta Ads</h3>
+          <p className="text-sm text-[rgb(var(--muted))] mt-1">
+            Status do sync diário · histórico de execuções e consumo de cota
+          </p>
+          <span className="text-xs text-navy font-bold mt-3 inline-block group-hover:underline">
+            Abrir →
+          </span>
+        </Link>
       </div>
 
       <div className="card text-xs text-[rgb(var(--muted))]">
-        <strong className="text-ink">Próximas fases:</strong> Relatórios Diários · Action toolbar CRUD Meta · Inteligência IA · Comercial · CS · Debriefings · Portal Cliente · Gestão Interna · App Unificado.
+        <strong className="text-ink">Próximas fases:</strong> Relatórios Diários · Comercial · CS · Debriefings · Portal Cliente · Gestão Interna · App Unificado.
       </div>
     </div>
   );

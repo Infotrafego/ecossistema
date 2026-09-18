@@ -3,13 +3,13 @@
 /**
  * Ranking com barra de filtros · usado por Criativos, Públicos e Campanhas.
  *
- * Concentra ordenação, busca e filtros avançados num só lugar para que as três
+ * Concentra ordenação, busca, seleção e paginação num só lugar para que as três
  * abas tenham exatamente o mesmo comportamento — era isso que o mockup fazia
  * com `data-scope` e um único handler de sort.
  */
 
-import { useMemo, useState } from 'react';
-import { ChevronDown, Search, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   ALERTA_INFO,
@@ -29,6 +29,16 @@ export interface SortSection {
   chaves: SortKey[];
 }
 
+/**
+ * Acima disto a lista pagina.
+ *
+ * Critério de pronto da fase: "paginação acima de 100 linhas". 50 por página
+ * mantém o DOM leve — com 130 criativos × 8 caixas de métrica cada, renderizar
+ * tudo de uma vez é o que fazia a aba passar de 2s.
+ */
+const POR_PAGINA = 50;
+const LIMITE_SEM_PAGINACAO = 100;
+
 interface RankingViewProps {
   itens: Metricas[];
   sortSections: SortSection[];
@@ -40,6 +50,9 @@ interface RankingViewProps {
   /** Conteúdo extra por item — usado no drill-down da aba Campanhas. */
   renderDetalhe?: (item: Metricas) => React.ReactNode;
   onSortChange?: (key: SortKey) => void;
+  /** Seleção alimenta a action toolbar (Fase 2b). */
+  onSelecionar?: (item: Metricas | null) => void;
+  selecionadoId?: string | null;
 }
 
 export function RankingView({
@@ -51,6 +64,8 @@ export function RankingView({
   filtrosAvancados = false,
   renderDetalhe,
   onSortChange,
+  onSelecionar,
+  selecionadoId = null,
 }: RankingViewProps) {
   const [sort, setSort] = useState<SortKey>(sortInicial);
   const [busca, setBusca] = useState('');
@@ -60,6 +75,7 @@ export function RankingView({
   const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [formato, setFormato] = useState<'all' | 'Vídeo' | 'Imagem'>('all');
   const [expandido, setExpandido] = useState<string | null>(null);
+  const [pagina, setPagina] = useState(0);
 
   const filtrosAtivos =
     (alerta !== 'all' ? 1 : 0) + (status !== 'all' ? 1 : 0) + (formato !== 'all' ? 1 : 0);
@@ -81,10 +97,28 @@ export function RankingView({
     return ordenar(filtrados, sort);
   }, [itens, busca, alerta, status, formato, sort]);
 
+  // Mudar filtro ou ordenação com a página 3 aberta deixaria o gestor olhando
+  // pro fim de uma lista que ele acabou de trocar.
+  useEffect(() => {
+    setPagina(0);
+  }, [busca, alerta, status, formato, sort]);
+
+  const paginado = visiveis.length > LIMITE_SEM_PAGINACAO;
+  const totalPaginas = paginado ? Math.ceil(visiveis.length / POR_PAGINA) : 1;
+  const paginaAtual = Math.min(pagina, totalPaginas - 1);
+  const naTela = paginado
+    ? visiveis.slice(paginaAtual * POR_PAGINA, (paginaAtual + 1) * POR_PAGINA)
+    : visiveis;
+
   function escolherSort(key: SortKey) {
     setSort(key);
     setMenuAberto(false);
     onSortChange?.(key);
+  }
+
+  function aoClicar(item: Metricas) {
+    if (onSelecionar) onSelecionar(selecionadoId === item.id ? null : item);
+    if (renderDetalhe) setExpandido((atual) => (atual === item.id ? null : item.id));
   }
 
   return (
@@ -218,9 +252,9 @@ export function RankingView({
           ? `${itens.length} ${itens.length === 1 ? substantivo.singular : substantivo.plural}`
           : `${visiveis.length} de ${itens.length} ${substantivo.plural}`}{' '}
         · ordenado por {SORT_LABELS[sort]}
+        {paginado && ` · página ${paginaAtual + 1} de ${totalPaginas}`}
       </p>
 
-      {/* Cards */}
       {visiveis.length === 0 ? (
         <div className="card text-center py-10">
           <p className="text-sm text-[rgb(var(--muted))]">
@@ -229,21 +263,70 @@ export function RankingView({
         </div>
       ) : (
         <div className="space-y-2">
-          {visiveis.map((item, i) => (
+          {naTela.map((item, i) => (
             <RankingCard
               key={item.id}
-              posicao={i + 1}
+              posicao={paginaAtual * POR_PAGINA + i + 1}
               item={item}
               destaque={sort}
-              expandivel={Boolean(renderDetalhe)}
+              clicavel={Boolean(renderDetalhe || onSelecionar)}
+              selecionado={selecionadoId === item.id}
               expandido={expandido === item.id}
-              onToggle={() => setExpandido((atual) => (atual === item.id ? null : item.id))}
+              onClick={() => aoClicar(item)}
               detalhe={renderDetalhe?.(item)}
             />
           ))}
         </div>
       )}
+
+      {paginado && (
+        <div className="flex items-center justify-center gap-2 pt-1">
+          <BotaoPagina
+            onClick={() => setPagina((p) => Math.max(0, p - 1))}
+            desabilitado={paginaAtual === 0}
+          >
+            <ChevronLeft size={14} />
+            Anterior
+          </BotaoPagina>
+          <span className="text-[11px] text-[rgb(var(--muted))] font-bold tabular-nums px-2">
+            {paginaAtual + 1} / {totalPaginas}
+          </span>
+          <BotaoPagina
+            onClick={() => setPagina((p) => Math.min(totalPaginas - 1, p + 1))}
+            desabilitado={paginaAtual >= totalPaginas - 1}
+          >
+            Próxima
+            <ChevronRight size={14} />
+          </BotaoPagina>
+        </div>
+      )}
     </div>
+  );
+}
+
+function BotaoPagina({
+  onClick,
+  desabilitado,
+  children,
+}: {
+  onClick: () => void;
+  desabilitado: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={desabilitado}
+      className={cn(
+        'flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[11px] font-bold transition',
+        desabilitado
+          ? 'border-[rgb(var(--border))] text-[rgb(var(--muted))] opacity-50 cursor-not-allowed'
+          : 'border-[rgb(var(--border))] hover:border-navy/40',
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -288,17 +371,19 @@ function RankingCard({
   posicao,
   item,
   destaque,
-  expandivel,
+  clicavel,
+  selecionado,
   expandido,
-  onToggle,
+  onClick,
   detalhe,
 }: {
   posicao: number;
   item: Metricas;
   destaque: SortKey;
-  expandivel: boolean;
+  clicavel: boolean;
+  selecionado: boolean;
   expandido: boolean;
-  onToggle: () => void;
+  onClick: () => void;
   detalhe?: React.ReactNode;
 }) {
   const info = ALERTA_INFO[item.alerta];
@@ -317,14 +402,23 @@ function RankingCard({
   // Se a ordenação for por uma métrica de projeção, mostra ela no lugar do CTR.
   const projecoes: SortKey[] = ['reunioes', 'vendas', 'receita', 'cac', 'roas', 'ltv'];
   if (projecoes.includes(destaque)) {
-    metricas[7] = { label: SORT_LABELS[destaque].replace(' ↓', ''), valor: fmtMetrica(item, destaque), chave: destaque };
+    metricas[7] = {
+      label: SORT_LABELS[destaque].replace(' ↓', ''),
+      valor: fmtMetrica(item, destaque),
+      chave: destaque,
+    };
   }
 
   return (
-    <article className="card p-0 overflow-hidden">
+    <article
+      className={cn(
+        'card p-0 overflow-hidden transition',
+        selecionado && 'ring-2 ring-navy border-navy',
+      )}
+    >
       <div
-        className={cn('p-3', expandivel && 'cursor-pointer hover:bg-[rgb(var(--border))]/30 transition')}
-        onClick={expandivel ? onToggle : undefined}
+        className={cn('p-3', clicavel && 'cursor-pointer hover:bg-[rgb(var(--border))]/30 transition')}
+        onClick={clicavel ? onClick : undefined}
       >
         <div className="flex items-start gap-3">
           <span className="w-6 h-6 shrink-0 rounded bg-[rgb(var(--border))] flex items-center justify-center text-[10px] font-extrabold text-[rgb(var(--muted))]">
@@ -359,7 +453,7 @@ function RankingCard({
             )}
           </div>
 
-          {expandivel && (
+          {detalhe !== undefined && (
             <ChevronDown
               size={16}
               className={cn(
@@ -388,7 +482,7 @@ function RankingCard({
         </div>
       </div>
 
-      {expandivel && expandido && detalhe && (
+      {expandido && detalhe && (
         <div className="border-t border-[rgb(var(--border))] bg-[rgb(var(--bg))] p-3">{detalhe}</div>
       )}
     </article>
