@@ -45,11 +45,18 @@ async function main() {
 
   if (!cliente) throw new Error('cliente piloto não encontrado');
 
+  // Janela configuravel: o padrao cobre os ultimos 30 dias, que e o recorte
+  // que o dashboard abre. `--desde/--ate` permitem conferir outro periodo.
+  const arg = (n: string) => {
+    const i = process.argv.indexOf(`--${n}`);
+    return i >= 0 ? process.argv[i + 1] : undefined;
+  };
+  const hoje = new Date().toISOString().slice(0, 10);
   const filtros = {
     clientId: cliente.id,
     funilId: null,
-    desde: '2025-12-01',
-    ate: '2026-09-18',
+    desde: arg('desde') ?? new Date(Date.now() - 29 * 86_400_000).toISOString().slice(0, 10),
+    ate: arg('ate') ?? hoje,
   };
 
   const dados = await getDadosIntel(filtros, supabase as never);
@@ -95,14 +102,17 @@ async function main() {
   checar('leads: públicos = total', somaLeads(dados.publicos) === dados.total.leads);
   checar('leads: campanhas = total', somaLeads(dados.campanhas) === dados.total.leads);
 
-  // O número que a API devolveu no diagnóstico de 18/09/2026.
-  checar(
-    'investido bate com o que a Meta reportou (R$ 22.031,77)',
-    mesmoValor(dados.total.spend, 22031.77),
-    dados.total.spend,
-  );
-  checar('leads batem com o consolidado da Meta (181)', dados.total.leads === 181, dados.total.leads);
-  checar('impressões batem (264.172)', dados.total.impressoes === 264172, dados.total.impressoes);
+  // Estes tres so fazem sentido na janela completa do historico REAL, onde os
+  // numeros foram conferidos contra a resposta da API.
+  if (filtros.desde === '2025-12-01' && filtros.ate === '2026-09-18') {
+    checar(
+      'investido bate com o que a Meta reportou (R$ 22.031,77)',
+      mesmoValor(dados.total.spend, 22031.77),
+      dados.total.spend,
+    );
+    checar('leads batem com o consolidado da Meta (181)', dados.total.leads === 181, dados.total.leads);
+    checar('impressões batem (264.172)', dados.total.impressoes === 264172, dados.total.impressoes);
+  }
 
   // Cada combo é um ad; nenhum pode aparecer duas vezes.
   const ids = dados.combos.map((c) => c.id);

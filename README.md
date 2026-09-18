@@ -196,6 +196,36 @@ compra pelo pixel, o número real vence a projeção automaticamente.
 | Action toolbar (6+5+6) com auditoria e rollback | ✅ código · ⏳ 1ª ação real |
 | Regras Auto · Copy IA · Assistente | ✅ código · ⏳ 1ª chamada paga ao Claude |
 
+### ⚠ Dados de demonstração ativos
+
+O banco está **com dados de demonstração** para que o dashboard abra populado no
+recorte padrão de 30 dias. Não confunda com produção real:
+
+```bash
+npm run demo:status     # o que está no banco
+npm run demo:remover    # apaga tudo que é demonstração
+npm run demo:aplicar    # gera de novo
+```
+
+Como funciona ([scripts/mock-dados.ts](scripts/mock-dados.ts)): em vez de uma camada
+de mock no código, o script **copia a fatia mais rica do histórico REAL** e a desloca
+no tempo para terminar hoje. Nomes de campanha, verba, CTR, CPL e curva de criativo
+são os de verdade; o pipeline exercitado é o mesmo de produção.
+
+Toda linha gerada leva `raw_data = {"mock": true}` — é por essa marca que o
+`--remover` apaga, sem chutar intervalo de data. Nenhuma linha real é tocada: a fatia
+deslocada cai depois de 23/06/2026, faixa sem dado real, então não há colisão de PK.
+
+**O que é inventado, e só isto:** as etapas comerciais (formulário iniciado, lead
+qualificado, agendamento, proposta). A Meta não as reporta porque dependem do CRM, que
+é integração de outra fase. São derivadas do número real de leads do dia, simulando
+lead a lead com um sorteio determinístico, o que mantém as etapas aninhadas e as taxas
+corretas no agregado. Reunião realizada e venda seguem **projetadas por benchmark**,
+como em produção, com o selo "Proj" no cone.
+
+Também ficam gravados (e sobrevivem ao `--remover`, porque são config e não dado): o
+vínculo das 8 campanhas ao funil de aquisição, e verba/metas de setembro/2026.
+
 ### Sobre a conta piloto
 
 `act_616936072501143` ("CA1.0 - Infotráfego") **não entrega desde 23/06/2026** — as 28

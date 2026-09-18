@@ -14,6 +14,9 @@
     "meta:diagnostico": "node scripts/run.cjs scripts/diagnostico-meta.ts",
     "meta:sync": "node scripts/run.cjs scripts/sync-manual.ts",
     "fadiga": "node scripts/run.cjs scripts/rodar-fadiga.ts",
+    "demo:aplicar": "node scripts/run.cjs scripts/mock-dados.ts --aplicar",
+    "demo:remover": "node scripts/run.cjs scripts/mock-dados.ts --remover",
+    "demo:status": "node scripts/run.cjs scripts/mock-dados.ts --status",
     "db:push": "supabase db push",
     "db:seed": "supabase db reset",
     "db:types": "supabase gen types typescript --local > types/database.ts"
