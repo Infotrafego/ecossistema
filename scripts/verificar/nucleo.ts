@@ -17,6 +17,7 @@ import { etapasDoInsight, conversaoPrimaria, receitaDoInsight, actionsNaoMapeada
 import { agregarInsights } from '@/lib/meta-ads/sync';
 import { fatiarJanela } from '@/lib/meta-ads/client';
 import { kpisDoFunil } from '@/lib/funil-kpis';
+import { montarCarteira, hojeBrt, type DadosEscuta, type LinhaEscutaSinal } from '@/lib/cs';
 
 let falhas = 0;
 let total = 0;
@@ -399,6 +400,75 @@ secao('KPIs derivados do par família·sub-objetivo');
 
   const derivadasSempre = kpisDoFunil('venda_direta', 'produto_digital', ['impressao', 'compra']);
   ok('métrica derivada passa mesmo sem etapa', derivadasSempre.some((k) => k.label === 'ROAS'));
+}
+
+// ── Central CS · escuta dos grupos ───────────────────────────────────────────
+secao('Central CS · carteira a partir da escuta');
+{
+  const hoje = '2026-09-27';
+  const sinal = (p: Partial<LinhaEscutaSinal> & Pick<LinhaEscutaSinal, 'id' | 'client_slug' | 'dia' | 'categoria'>): LinhaEscutaSinal => ({
+    cliente: p.client_slug,
+    grupo: null,
+    scanned_at: `${p.dia}T18:00:00+00:00`,
+    sentimento: 0,
+    urgencia: 'media',
+    autor_papel: 'cliente',
+    assunto: `assunto ${p.id}`,
+    virou_subtarefa: false,
+    ...p,
+  });
+  const cliente = (slug: string, ultimaCliente: string | null) => ({
+    client_slug: slug,
+    cliente: slug.toUpperCase(),
+    grupos: 1,
+    escuta_desde: '2026-09-15T03:00:00+00:00',
+    ultima_mensagem: ultimaCliente,
+    ultima_mensagem_cliente: ultimaCliente,
+    ultima_mensagem_time: null,
+  });
+  const dados: DadosEscuta = {
+    clientes: [
+      cliente('calmo', '2026-09-26T15:00:00+00:00'),
+      cliente('bravo', '2026-09-26T15:00:00+00:00'),
+      cliente('mudo', null),
+    ],
+    sinais: [
+      sinal({ id: 1, client_slug: 'bravo', dia: '2026-09-25', categoria: 'INSATISFACAO', sentimento: -2 }),
+      sinal({ id: 2, client_slug: 'bravo', dia: '2026-09-26', categoria: 'INSATISFACAO', sentimento: -2 }),
+      sinal({ id: 3, client_slug: 'bravo', dia: '2026-09-26', categoria: 'ERRO', urgencia: 'alta', sentimento: -1 }),
+      sinal({ id: 4, client_slug: 'bravo', dia: '2026-09-26', categoria: 'ERRO', autor_papel: 'time' }),
+      sinal({ id: 5, client_slug: 'calmo', dia: '2026-09-26', categoria: 'ELOGIO', sentimento: 2 }),
+      sinal({ id: 6, client_slug: 'calmo', dia: '2026-09-10', categoria: 'DEMANDA' }), // fora dos 7d, dentro dos 30d
+    ],
+    diaria: [
+      { client_slug: 'bravo', cliente: 'BRAVO', dia: '2026-09-18', grupos_com_conversa: 1, sinais: 0, demandas: 0, erros: 0, insatisfacoes: 0, elogios: 0, sentimento_cliente: null, sentimento_resumo: 1 },
+      { client_slug: 'bravo', cliente: 'BRAVO', dia: '2026-09-26', grupos_com_conversa: 1, sinais: 3, demandas: 0, erros: 1, insatisfacoes: 1, elogios: 0, sentimento_cliente: -1.5, sentimento_resumo: -1 },
+      { client_slug: 'calmo', cliente: 'CALMO', dia: '2026-09-26', grupos_com_conversa: 1, sinais: 1, demandas: 0, erros: 0, insatisfacoes: 0, elogios: 1, sentimento_cliente: 2, sentimento_resumo: 1 },
+    ],
+    pendencias: [
+      { client_slug: 'bravo', cliente: 'BRAVO', grupo: null, dia: '2026-09-24', atualizado_em: '2026-09-24T21:00:00+00:00', lado: 'nossa', ordem: 1, item: 'Corrigir X' },
+      { client_slug: 'bravo', cliente: 'BRAVO', grupo: null, dia: '2026-09-24', atualizado_em: '2026-09-24T21:00:00+00:00', lado: 'cliente', ordem: 1, item: 'Mandar Y' },
+    ],
+  };
+  const c = montarCarteira(dados, hoje);
+  const bravo = c.clientes.find((x) => x.id === 'bravo')!;
+  const calmo = c.clientes.find((x) => x.id === 'calmo')!;
+  const mudo = c.clientes.find((x) => x.id === 'mudo')!;
+
+  eq('carteira ordenada por urgência', c.clientes.map((x) => x.id), ['bravo', 'mudo', 'calmo']);
+  eq('duas insatisfações + erro + tom + pendência = risco', [bravo.status, bravo.riskScore], ['risco', 50 + 10 + 15 + 5]);
+  ok('erro escrito pelo time não conta no risco', !bravo.sinaisRisco.some((s) => s.msg.includes('2 erros')));
+  eq('insatisfação vem primeiro nos sinais', bravo.sinaisRisco[0].tipo, 'insatisfacao');
+  eq('volume 7d por categoria', bravo.volume7d, { DEMANDA: 0, ERRO: 2, INSATISFACAO: 2, ELOGIO: 0 });
+  eq('volume 30d inclui o que ficou fora dos 7d', [calmo.volume7d.DEMANDA, calmo.volume30d.DEMANDA], [0, 1]);
+  eq('tendência tem 14 pontos terminando hoje', [bravo.tendencia.pontos.length, bravo.tendencia.pontos[13].dia], [14, hoje]);
+  eq('tom caiu de +1 para -1 → piorando', [bravo.tendencia.tom7dAnterior, bravo.tendencia.tom7d, bravo.tendencia.direcao], [1, -1, 'caindo']);
+  eq('pendência conta dias desde o resumo', bravo.pendencias.nossas[0].diasDesde, 3);
+  eq('cliente que nunca escreveu: silêncio desde o início da escuta', [mudo.diasSemMsgCliente, mudo.status], [12, 'atencao']);
+  eq('cliente com elogio e sem pendência é saudável', [calmo.status, calmo.riskScore], ['saudavel', 0]);
+  eq('touchpoint traz o sentimento em texto', calmo.touchpoints[0].sentimento, 'positivo');
+  eq('kpis somam a carteira', [c.kpis.total, c.kpis.emRisco, c.kpis.pendenciasNossas, c.kpis.pendenciasDeles], [3, 1, 1, 1]);
+  eq('hoje em Brasília vira o dia só às 03:00 UTC', [hojeBrt(new Date('2026-09-28T02:59:00Z')), hojeBrt(new Date('2026-09-28T03:00:00Z'))], ['2026-09-27', '2026-09-28']);
 }
 
 // ── Resultado ────────────────────────────────────────────────────────────────

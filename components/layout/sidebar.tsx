@@ -146,7 +146,7 @@ const NAV: Grupo[] = [
     nome: 'CS · Gestão de Carteira',
     items: [
       { href: '/dashboard/cs?tab=portfolio', label: 'Portfolio', icon: Briefcase },
-      { href: '/dashboard/cs?tab=riscos', label: 'Riscos', icon: TriangleAlert, pill: '5', pillWarn: true },
+      { href: '/dashboard/cs?tab=riscos', label: 'Riscos', icon: TriangleAlert },
       { href: '/dashboard/cs?tab=cliente', label: 'Drill-down por Cliente', icon: HeartPulse },
       { href: '/dashboard/cs?tab=pendencias', label: 'Pendências', icon: ClipboardList },
       { href: '/dashboard/cs?tab=calendario', label: 'Calendário', icon: Calendar },

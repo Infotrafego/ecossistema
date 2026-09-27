@@ -19,6 +19,12 @@
 
 import type { EtapaId, Familia, ModoCaptura, SubObjetivo } from '@/lib/funil';
 import type { Condicao } from '@/lib/regras';
+import type {
+  LinhaEscutaCliente,
+  LinhaEscutaDiaria,
+  LinhaEscutaPendencia,
+  LinhaEscutaSinal,
+} from '@/lib/cs';
 
 export type Json =
   | string
@@ -327,6 +333,14 @@ type Tabela<T extends keyof Rows> = {
   Relationships: [];
 };
 
+// Views só-leitura (as da Central CS vêm de `lib/cs.ts`, fonte única do shape).
+// O mapped type é de propósito: `interface` não satisfaz o `Record<string,
+// unknown>` que o supabase-js exige do Row, e aí o schema inteiro vira `never`.
+type Visao<R> = {
+  Row: { [K in keyof R]: R[K] };
+  Relationships: [];
+};
+
 export type Database = {
   __InternalSupabase: {
     PostgrestVersion: '14.1';
@@ -353,7 +367,12 @@ export type Database = {
       copy_sugestoes: Tabela<'copy_sugestoes'>;
       assistente_mensagens: Tabela<'assistente_mensagens'>;
     };
-    Views: { [_ in never]: never };
+    Views: {
+      cs_escuta_clientes: Visao<LinhaEscutaCliente>;
+      cs_escuta_sinais: Visao<LinhaEscutaSinal>;
+      cs_escuta_diaria: Visao<LinhaEscutaDiaria>;
+      cs_escuta_pendencias: Visao<LinhaEscutaPendencia>;
+    };
     Functions: { [_ in never]: never };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
