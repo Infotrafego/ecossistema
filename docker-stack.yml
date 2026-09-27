@@ -30,11 +30,13 @@ services:
       META_WRITE_ALLOWED_ACCOUNTS: ${META_WRITE_ALLOWED_ACCOUNTS:-}
       META_SANDBOX_ACCOUNTS: ${META_SANDBOX_ACCOUNTS:-}
       # Sync diário no próprio container (exige replicas: 1, abaixo)
-      SYNC_CRON_ENABLED: ${SYNC_CRON_ENABLED:-false}
+      # ⚠ Desligado no deploy de propósito: o env do Portainer diz `true`, mas
+      # este literal manda. Religar = voltar para ${SYNC_CRON_ENABLED:-false}.
+      SYNC_CRON_ENABLED: "false"
       SYNC_HORA_UTC: ${SYNC_HORA_UTC:-7}
       SYNC_SECRET: ${SYNC_SECRET:-}
       # Também disponível em runtime (redirects/SSR); o valor de build manda no client
-      NEXT_PUBLIC_APP_URL: https://ecossistema.servidordainfotrafego.com.br
+      NEXT_PUBLIC_APP_URL: https://ecossistema.vps.infotrafego.com.br
     networks:
       - traefik_public
     deploy:
@@ -51,10 +53,16 @@ services:
       labels:
         - "traefik.enable=true"
         - "traefik.docker.network=traefik_public"
-        - "traefik.http.routers.ecossistema.rule=Host(`ecossistema.servidordainfotrafego.com.br`)"
+        - "traefik.http.routers.ecossistema.rule=Host(`ecossistema.vps.infotrafego.com.br`)"
         - "traefik.http.routers.ecossistema.entrypoints=websecure"
         - "traefik.http.routers.ecossistema.tls=true"
         - "traefik.http.routers.ecossistema.tls.certresolver=le"
+        # Domínio antigo (perdido em 2026-09-25): router legado só enquanto ainda
+        # houver link apontando pra ele. Sai junto com os outros legados da VPS.
+        - "traefik.http.routers.ecossistema_legacy.rule=Host(`ecossistema.servidordainfotrafego.com.br`)"
+        - "traefik.http.routers.ecossistema_legacy.entrypoints=websecure"
+        - "traefik.http.routers.ecossistema_legacy.tls=true"
+        - "traefik.http.routers.ecossistema_legacy.tls.certresolver=le"
         - "traefik.http.services.ecossistema.loadbalancer.server.port=3000"
 
 networks:
